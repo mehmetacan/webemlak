@@ -1,9 +1,21 @@
 {
-  // Cloudflare Workers: public/ klasöründeki statik site olarak yayınlanır
+  // Asya Emlak: public/ klasöründeki site + src/index.js içindeki API
   "name": "webemlak",
+  "main": "src/index.js",
   "compatibility_date": "2026-10-01",
+  "workers_dev": true,
+  "preview_urls": false,
   "assets": {
     "directory": "./public",
-    "not_found_handling": "single-page-application"
-  }
+    "binding": "ASSETS",
+    "run_worker_first": ["/api/*", "/img/*"]
+  },
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "webemlak-db",
+      "database_id": "3ed874fb-10fc-44a4-b81d-f08de3862bf5",
+      "migrations_dir": "migrations"
+    }
+  ]
 }
