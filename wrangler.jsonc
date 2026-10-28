@@ -17,5 +17,11 @@
       "database_id": "3ed874fb-10fc-44a4-b81d-f08de3862bf5",
       "migrations_dir": "migrations"
     }
+  ],
+  "r2_buckets": [
+    {
+      "binding": "FOTO",
+      "bucket_name": "webemlak-foto"
+    }
   ]
 }
