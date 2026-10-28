@@ -1,5 +1,8 @@
 # Asya Emlak
 
-Asya Emlak web sitesi. Cloudflare Pages bu depodaki `main` dalını otomatik yayınlar.
+Asya Emlak web sitesi.
 
-- `index.html`: sitenin tamamı (ön yüz prototipi)
+- `public/index.html`: sitenin tamamı (ön yüz prototipi)
+- `wrangler.jsonc`: Cloudflare Workers ayarı (`public/` klasörünü yayınlar)
+
+`main` dalına gönderilen her değişiklik Cloudflare tarafından otomatik yayınlanır.
