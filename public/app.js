@@ -86,35 +86,75 @@ function renderNav() {
   $('#hl').hidden = r === 'v';
   if (me) $('#hl').textContent = me.ad.split(' ')[0] || 'Hesabım';
   $('#pl').textContent = canAll() ? 'İlan yönetimi' : 'İlanlarım';
-  $('#al').textContent = 'Kullanıcılar';
-  const fc = $('#fcn'); if (fc) fc.textContent = FAV.length ? ` (${FAV.length})` : '';
+  const fc = $('#fcn'); if (fc) fc.textContent = FAV.length ? String(FAV.length) : '';
+  $('#nav').classList.remove('open'); $('#mb').setAttribute('aria-expanded', 'false'); document.body.style.overflow = '';
 }
 
 // ---------- Kartlar ----------
 function card(l) {
-  return `<div class="cdw"><a class="cd" href="${esc(l.url)}">${ph(l.p[0])}<div class="b"><span class="tg">${esc(l.tip)}</span><div class="pc">${fiyat(l)}</div><div>${esc(l.t)}</div><div class="mu">${yer(l)}</div><div class="sp2"><span>${l.m2} m²</span>${ARSA(l.tur) ? `<span>${esc(l.tur)}</span>` : `<span>${esc(l.oda)}</span><span>${kt(l)}</span><span>${l.as ? 'Asansörlü' : 'Asansörsüz'}</span>`}</div></div></a>${favBtn(l)}</div>`;
+  return `<div class="cdw"><a class="cd" href="${esc(l.url)}"><div class="cimg">${ph(l.p[0])}<span class="ctg">${esc(l.tip)}</span></div><div class="b"><div class="pc">${fiyat(l)}</div><div class="ct">${esc(l.t)}</div><div class="mu">${yer(l)}</div><div class="sp2"><span>${l.m2} m²</span>${ARSA(l.tur) ? `<span>${esc(l.tur)}</span>` : `<span>${esc(l.oda)}</span><span>${kt(l)}</span><span>${l.as ? 'Asansörlü' : 'Asansörsüz'}</span>`}</div></div></a>${favBtn(l)}</div>`;
 }
 
-// ---------- Ana sayfa ----------
-const io = new IntersectionObserver((es) => es.forEach((x) => { if (x.isIntersecting) { x.target.classList.add('in'); io.unobserve(x.target); } }), { threshold: 0.12 });
-const rv = () => document.querySelectorAll('.rv').forEach((e) => io.observe(e));
-const cu = () => document.querySelectorAll('[data-n]').forEach((e) => { const t = +e.dataset.n; let i = 0; const s = () => { e.textContent = Math.round((t * ++i) / 36); if (i < 36) requestAnimationFrame(s); }; s(); });
 const R = () => { F = { tip: '', q: '', pmin: '', pmax: '', amin: '', amax: '', oda: [], kat: '', as: '', s: F.s, tur: '', yas: '', oz: [], il: '' }; };
-
+// ---------- Ana sayfa ----------
+const SRCH = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><circle cx="11" cy="11" r="6.5"/><path d="M20 20l-4-4"/></svg>';
+const ARR = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" width="16" height="16"><path d="M5 12h14M13 6l6 6-6 6"/></svg>';
+const CAT_IC = {
+  Daire: '<svg viewBox="0 0 32 32" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="7" y="4" width="18" height="24" rx="1.5"/><path d="M11 9h3M18 9h3M11 14h3M18 14h3M11 19h3M18 19h3M14 28v-4h4v4"/></svg>',
+  Villa: '<svg viewBox="0 0 32 32" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M3 15l9-7 9 7"/><path d="M5 13.5V26h14V13.5"/><path d="M19 18h10v8H19"/><path d="M10 26v-6h4v6M3 29h26"/></svg>',
+  Müstakil: '<svg viewBox="0 0 32 32" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M4 15L16 5l12 10"/><path d="M7 12.5V27h18V12.5"/><path d="M13 27v-7h6v7"/><path d="M22 7v4"/></svg>',
+  Dubleks: '<svg viewBox="0 0 32 32" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M5 13L16 5l11 8"/><path d="M7 11.5V27h18V11.5"/><path d="M7 19h18"/><path d="M11 14h3M18 14h3M14 27v-4h4v4"/></svg>',
+  Arsa: '<svg viewBox="0 0 32 32" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M3 23l8-7 6 5 5-4 7 6"/><path d="M3 27h26"/><path d="M22 5v8M22 5l5 2-5 2"/></svg>',
+};
+let HXT = 0;
 function home() {
-  const a = L, n = (t, v) => `<div><b data-n="${v}">0</b><span class="mu">${t}</span></div>`;
-  const vc = (c, l) => (l ? `<div class="vc ${c}">${ph(l.p[0])}<div class="b"><b class="pc" style="font-size:15px">${fiyat(l)}</b><br>${esc(l.ilce)}, ${esc(l.il)}</div></div>` : '');
-  const yerler = [...new Set(L.map((l) => l.ilce + ', ' + l.il))];
-  const ds = yerler.map((x) => `<span>${esc(x)}</span>`).join('');
-  $('#app').innerHTML = `<section class="hero"><i class="ob o1"></i><i class="ob o2"></i><div class="hg"><div><h1>${esc(SS.hero)}</h1><p>${esc(SS.sub)}</p><form class="sr" id="hs"><select name="tip"><option value="">Satılık ve kiralık</option><option>Satılık</option><option>Kiralık</option></select><input name="q" placeholder="Şehir, ilçe, kelime veya ilan no"><button class="pr">İlanları göster</button></form><div class="st">${n('güncel ilan', a.length)}${n('satılık', a.filter((l) => l.tip === 'Satılık').length)}${n('kiralık', a.filter((l) => l.tip === 'Kiralık').length)}${n('danışman', DAN)}</div></div><div class="vis">${vc('v1', a[0])}${vc('v2', a[1])}${vc('v3', a[2])}</div></div></section>${yerler.length ? `<div class="mq"><div>${ds}${ds}</div></div>` : ''}<div class="w rv"><h2>Öne çıkan ilanlar</h2>${a.length ? `<div class="grid">${a.slice(0, 3).map(card).join('')}</div><p><a class="tg" href="/ilanlar">Tüm ilanları gör</a></p>` : '<div class="pn mu">Henüz yayında ilan yok. Danışmanlarımız ilan ekledikçe burada görünecek.</div>'}</div><div class="w rv"><h2>Neden Asya Emlak?</h2><div class="ft"><div class="pn"><h3>Kontrol edilmiş ilanlar</h3><span class="mu">Her ilan yönetici denetiminden geçer, gerektiğinde yayından kaldırılır.</span></div><div class="pn"><h3>Doğrudan danışman</h3><span class="mu">İlan sahibine telefon, e-posta veya WhatsApp ile tek adımda ulaşın.</span></div><div class="pn"><h3>Net filtreler</h3><span class="mu">Fiyat, alan, oda, kat, bina yaşı ve özelliklerle aradığınızı daraltın.</span></div></div></div><div class="w rv"><div class="pn cta"><div><h2 style="margin:0">Mülkünüzü satmak veya kiralamak mı istiyorsunuz?</h2><span class="mu">Danışmanlarımızla görüşün, size uygun yol haritasını birlikte çıkaralım.</span></div><a class="ba" href="/iletisim">Bize ulaşın</a></div></div>`;
-  $('#hs').onsubmit = (e) => { e.preventDefault(); const d = new FormData(e.target), q = String(d.get('q') || '').trim(); const byNo = /^\d{6}$/.test(q) && L.find((l) => String(l.no) === q); if (byNo) return go(byNo.url); R(); F.tip = d.get('tip'); F.q = q; go('/ilanlar'); };
-  rv(); cu();
+  setTitle('');
+  const a = L, n = a.length;
+  const shots = a.filter((l) => typeof l.p[0] === 'string').slice(0, 4);
+  const cnt = (f) => a.filter(f).length;
+  const cats = [['Daire', cnt((l) => l.tur === 'Daire')], ['Villa', cnt((l) => l.tur === 'Villa')], ['Müstakil', cnt((l) => l.tur === 'Müstakil')], ['Dubleks', cnt((l) => l.tur === 'Dubleks')], ['Arsa', cnt((l) => ARSA(l.tur))]];
+  const reg = [...a.reduce((m, l) => { const k = l.ilce + '|' + l.il; m.set(k, (m.get(k) || 0) + 1); return m; }, new Map())].sort((x, y) => y[1] - x[1]).slice(0, 8);
+  const tel = (SS.tel || '').trim(), wa = tel.replace(/\D/g, '').replace(/^0/, '').replace(/^90/, '');
+  $('#app').innerHTML = `<section class="hx"><div class="hxbg ${shots.length ? '' : 'empty'}" id="hxbg">${shots.map((l, i) => `<img src="${esc(l.p[0])}" alt="" ${i ? 'loading="lazy"' : 'fetchpriority="high"'} class="${i ? '' : 'on'}" decoding="async">`).join('')}</div>
+   <div class="hxc"><h1>${esc(SS.hero || 'Yaşamak istediğiniz evi birlikte bulalım.')}</h1><p>${esc(SS.sub)}</p>
+    <form class="sx" id="hs" role="search"><div class="seg" role="group" aria-label="İlan tipi"><button type="button" data-tip="" class="on">Tümü</button><button type="button" data-tip="Satılık">Satılık</button><button type="button" data-tip="Kiralık">Kiralık</button></div><select name="tur" aria-label="Emlak türü"><option value="">Tüm türler</option>${['Daire', 'Villa', 'Müstakil', 'Dubleks', 'Arsa'].map((t) => `<option>${t}</option>`).join('')}</select><input name="q" placeholder="İl, ilçe, mahalle veya ilan no" aria-label="Konum veya ilan numarası" enterkeyhint="search"><button class="go">${SRCH}<span>Ara</span></button></form>
+    <div class="hxm"><span><b>${n}</b> güncel ilan${DAN ? ` · <b>${DAN}</b> danışman` : ''}</span>${shots.length ? `<span style="display:flex;align-items:center;gap:14px;min-width:0"><a class="hxcap" id="hxcap" href="${esc(shots[0].url)}"><span>${esc(shots[0].t)} · ${fiyat(shots[0])}</span>${ARR}</a>${shots.length > 1 ? `<span class="dots">${shots.map((_, i) => `<button type="button" data-hx="${i}" class="${i ? '' : 'on'}" aria-label="Fotoğraf ${i + 1}"></button>`).join('')}</span>` : ''}</span>` : ''}</div>
+   </div></section>
+  <section class="sec"><div class="sech"><div><h2>Ne arıyorsunuz?</h2><p>Emlak türüne göre ilanlara göz atın.</p></div></div><div class="cats">${cats.map(([t, c]) => `<button type="button" class="cat" data-cat="${t}">${CAT_IC[t]}<span><b>${t === 'Arsa' ? 'Arsa ve tarla' : t}</b><span>${c ? c + ' ilan' : 'Yakında'}</span></span></button>`).join('')}</div></section>
+  <section class="sec"><div class="sech"><div><h2>Yeni ilanlar</h2><p>Danışmanlarımızın son eklediği ilanlar.</p></div>${n ? `<a href="/ilanlar">Tümünü gör ${ARR}</a>` : ''}</div>${n ? `<div class="rail">${a.slice(0, 6).map(card).join('')}</div>` : '<div class="pn mu">Henüz yayında ilan yok. Danışmanlarımız ilan ekledikçe burada görünecek.</div>'}</section>
+  ${reg.length ? `<section class="sec"><div class="sech"><div><h2>Bölgeler</h2><p>İlanların bulunduğu ilçeler.</p></div></div><div class="rgn">${reg.map(([k, c]) => { const [ilce, il] = k.split('|'); return `<button type="button" class="rgi" data-rg="${esc(k)}"><span><b>${esc(ilce)}</b><small>${esc(il)}</small></span><i>${c} ilan ›</i></button>`; }).join('')}</div></section>` : ''}
+  <section class="band"><div class="bandi"><div><h2>Mülkünüzü satmak ya da kiraya vermek mi istiyorsunuz?</h2><p>Danışmanlarımızla görüşün; mülkünüzü doğru fiyatla, doğru kişilere ulaştıralım.</p></div><div class="bbtn">${tel ? `<a class="g" href="tel:${esc(tel)}">${PHONE} ${esc(tel)}</a>` : ''}${wa ? `<a class="wa" href="https://wa.me/90${esc(wa)}" target="_blank" rel="noopener">${WAI} WhatsApp ile yazın</a>` : ''}<a href="/iletisim">İletişim bilgileri ${ARR}</a></div></div></section>`;
+
+  // vitrin
+  let tip = '';
+  document.querySelectorAll('[data-tip]').forEach((b) => (b.onclick = () => { tip = b.dataset.tip; document.querySelectorAll('[data-tip]').forEach((x) => x.classList.toggle('on', x === b)); }));
+  $('#hs').onsubmit = (e) => {
+    e.preventDefault();
+    const d = new FormData(e.target), q = String(d.get('q') || '').trim();
+    const byNo = /^\d{6}$/.test(q) && L.find((l) => String(l.no) === q);
+    if (byNo) return go(byNo.url);
+    R(); F.tip = tip; F.tur = d.get('tur') || ''; F.q = q; go('/ilanlar');
+  };
+  document.querySelectorAll('[data-cat]').forEach((b) => (b.onclick = () => { R(); F.tur = b.dataset.cat; go('/ilanlar'); }));
+  document.querySelectorAll('[data-rg]').forEach((b) => (b.onclick = () => { const [ilce, il] = b.dataset.rg.split('|'); R(); F.il = il; F.q = ilce; go('/ilanlar'); }));
+  clearInterval(HXT);
+  if (shots.length > 1) {
+    let i = 0;
+    const show = (k) => {
+      i = (k + shots.length) % shots.length;
+      document.querySelectorAll('#hxbg img').forEach((im, j) => { if (j === i) { im.classList.remove('on'); void im.offsetWidth; } im.classList.toggle('on', j === i); });
+      document.querySelectorAll('[data-hx]').forEach((d, j) => d.classList.toggle('on', j === i));
+      const c = $('#hxcap'); if (c) { c.href = shots[i].url; c.querySelector('span').textContent = `${shots[i].t} · ${fiyat(shots[i])}`; }
+    };
+    document.querySelectorAll('[data-hx]').forEach((d) => (d.onclick = () => { show(+d.dataset.hx); clearInterval(HXT); }));
+    if (!matchMedia('(prefers-reduced-motion: reduce)').matches) HXT = setInterval(() => { if (!document.hidden && $('#hxbg')) show(i + 1); else if (!$('#hxbg')) clearInterval(HXT); }, 6500);
+  }
 }
 
 // ---------- İlanlar ve filtre ----------
 function filt() {
   const q = (F.q || '').toLocaleLowerCase('tr'), oz = F.oz || [];
-  const r = L.filter((l) => (!F.tip || l.tip === F.tip) && (!F.il || l.il === F.il) && (!F.tur || l.tur === F.tur)
+  const r = L.filter((l) => (!F.tip || l.tip === F.tip) && (!F.il || l.il === F.il) && (!F.tur || l.tur === F.tur || (F.tur === 'Arsa' && ARSA(l.tur)))
     && (!F.pmin || l.f >= +F.pmin) && (!F.pmax || l.f <= +F.pmax) && (!F.amin || l.m2 >= +F.amin) && (!F.amax || l.m2 <= +F.amax)
     && (!F.oda.length || F.oda.includes(String(Math.min(parseInt(l.oda) || 0, 4))))
     && (!F.kat || (F.kat === 'z' ? l.kat <= 0 : F.kat === '1' ? l.kat >= 1 && l.kat <= 3 : l.kat >= 4))
@@ -128,6 +168,7 @@ function filt() {
 }
 function rs() {
   const r = filt();
+  if ($('#ftg')) { const act = ['tip', 'tur', 'il', 'q', 'pmin', 'pmax', 'amin', 'amax', 'yas', 'kat', 'as'].filter((k) => F[k]).length + (F.oda.length ? 1 : 0) + ((F.oz || []).length ? 1 : 0); $('#ftg').lastChild.textContent = 'Filtrele' + (act ? ` (${act})` : ''); }
   $('#rs').innerHTML = `<div class="tp"><span class="mu">${r.length} ilan bulundu</span><select id="so">${[['', 'En yeni'], ['pa', 'Fiyat: artan'], ['pd', 'Fiyat: azalan'], ['m', 'm²: büyükten küçüğe']].map((o) => `<option value="${o[0]}" ${S(F.s, o[0])}>${o[1]}</option>`).join('')}</select></div>${r.length ? `<div class="grid">${r.map(card).join('')}</div>` : `<p class="mu">${L.length ? 'Filtreye uyan ilan yok. Fiyat veya m² aralığını genişletin.' : 'Henüz yayında ilan yok.'}</p>`}`;
   $('#so').onchange = (e) => { F.s = e.target.value; rs(); };
 }
@@ -136,10 +177,12 @@ const chk = (n, a, v) => `<span class="ck">${a.map((o) => `<label><input type="c
 function ilanlar() {
   const rg = (a, b) => `<span class="rg"><input name="${a}" type="number" min="0" placeholder="En az" value="${esc(F[a])}"><input name="${b}" type="number" min="0" placeholder="En çok" value="${esc(F[b])}"></span>`;
   const ils = [...new Set(L.map((l) => l.il))].sort((a, b) => a.localeCompare(b, 'tr')).map((x) => [x, x]);
-  $('#app').innerHTML = `<div class="w"><h2>İlanlar</h2><div class="ly"><div id="rs"></div><aside class="pn fp"><form id="ff"><h4 style="margin-top:0">İlan tipi</h4>${chk('tip', [['Satılık', 'Satılık'], ['Kiralık', 'Kiralık']], [F.tip])}<h4>Emlak türü</h4><select name="tur">${opt([['', 'Tümü'], ...TUR.map((t) => [t, t])], F.tur)}</select><h4>Konum</h4><select name="il">${opt([['', 'Tüm şehirler'], ...ils], F.il)}</select><input name="q" placeholder="İlçe, mahalle, kelime veya ilan no" value="${esc(F.q)}" style="margin-top:8px"><h4>Fiyat aralığı (₺)</h4>${rg('pmin', 'pmax')}<h4>Brüt alan (m²)</h4>${rg('amin', 'amax')}<h4>Oda sayısı</h4>${chk('oda', [['1', '1+1'], ['2', '2+1'], ['3', '3+1'], ['4', '4+']], F.oda)}<h4>Bina yaşı</h4><select name="yas">${opt([['', 'Fark etmez'], ['0', '0 - 5 yaş'], ['1', '6 - 15 yaş'], ['2', '16 ve üzeri']], F.yas)}</select><h4>Bulunduğu kat</h4><select name="kat">${opt([['', 'Fark etmez'], ['z', 'Zemin / giriş'], ['1', '1 - 3. kat'], ['4', '4. kat ve üzeri']], F.kat)}</select><h4>Asansör</h4><select name="as">${opt([['', 'Fark etmez'], ['1', 'Var'], ['0', 'Yok']], F.as)}</select><h4>Özellikler</h4>${chk('oz', OZ.map((o) => [o, o]), F.oz)}<button type="button" id="fc" style="width:100%;margin-top:18px">Filtreleri temizle</button></form></aside></div></div>`;
+  const act = ['tip', 'tur', 'il', 'q', 'pmin', 'pmax', 'amin', 'amax', 'yas', 'kat', 'as'].filter((k) => F[k]).length + (F.oda.length ? 1 : 0) + ((F.oz || []).length ? 1 : 0);
+  $('#app').innerHTML = `<div class="w"><h2>İlanlar</h2><button type="button" class="ftg" id="ftg" aria-expanded="false" aria-controls="fpn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 6h16M7 12h10M10 18h4"/></svg>Filtrele${act ? ` (${act})` : ''}</button><div class="ly"><div id="rs"></div><aside class="pn fp" id="fpn"><form id="ff"><h4 style="margin-top:0">İlan tipi</h4>${chk('tip', [['Satılık', 'Satılık'], ['Kiralık', 'Kiralık']], [F.tip])}<h4>Emlak türü</h4><select name="tur">${opt([['', 'Tümü'], ...TUR.map((t) => [t, t]), ['Arsa', 'Arsa (tarla ve parsel)']], F.tur)}</select><h4>Konum</h4><select name="il">${opt([['', 'Tüm şehirler'], ...ils], F.il)}</select><input name="q" placeholder="İlçe, mahalle, kelime veya ilan no" value="${esc(F.q)}" style="margin-top:8px"><h4>Fiyat aralığı (₺)</h4>${rg('pmin', 'pmax')}<h4>Brüt alan (m²)</h4>${rg('amin', 'amax')}<h4>Oda sayısı</h4>${chk('oda', [['1', '1+1'], ['2', '2+1'], ['3', '3+1'], ['4', '4+']], F.oda)}<h4>Bina yaşı</h4><select name="yas">${opt([['', 'Fark etmez'], ['0', '0 - 5 yaş'], ['1', '6 - 15 yaş'], ['2', '16 ve üzeri']], F.yas)}</select><h4>Bulunduğu kat</h4><select name="kat">${opt([['', 'Fark etmez'], ['z', 'Zemin / giriş'], ['1', '1 - 3. kat'], ['4', '4. kat ve üzeri']], F.kat)}</select><h4>Asansör</h4><select name="as">${opt([['', 'Fark etmez'], ['1', 'Var'], ['0', 'Yok']], F.as)}</select><h4>Özellikler</h4>${chk('oz', OZ.map((o) => [o, o]), F.oz)}<button type="button" id="fc" style="width:100%;margin-top:18px">Filtreleri temizle</button></form></aside></div></div>`;
   const f = $('#ff');
   f.oninput = f.onchange = () => { const d = new FormData(f), t = d.getAll('tip'); F = { ...F, tip: t.length === 1 ? t[0] : '', tur: d.get('tur'), il: d.get('il'), q: d.get('q'), pmin: d.get('pmin'), pmax: d.get('pmax'), amin: d.get('amin'), amax: d.get('amax'), oda: d.getAll('oda'), yas: d.get('yas'), kat: d.get('kat'), as: d.get('as'), oz: d.getAll('oz') }; rs(); };
   $('#fc').onclick = () => { R(); ilanlar(); };
+  $('#ftg').onclick = () => { const o = $('#fpn').classList.toggle('open'); $('#ftg').setAttribute('aria-expanded', String(o)); };
   rs();
 }
 
@@ -487,7 +530,7 @@ function settings() {
   if (me.rol !== 'admin') return errBox('Bu sayfa yalnızca yöneticiler içindir.');
   const f = (k, l) => `<label>${l}<input name="${k}" value="${esc(SS[k])}"></label>`;
   $('#app').innerHTML = `<div class="w"><h2>Site ayarları</h2><div class="pn"><form id="sf2"><div class="fm">${f('hero', 'Ana sayfa başlığı')}${f('sub', 'Ana sayfa alt metni')}${f('tel', 'Telefon')}${f('mail', 'E-posta')}${f('adr', 'Adres (haritada gösterilir)')}${f('saat', 'Çalışma saatleri')}</div><label class="mu" style="display:grid;gap:4px;margin-top:12px">Hakkımızda metni (paragraflar arasında boş satır bırakın)<textarea name="hak" style="min-height:160px">${esc(SS.hak)}</textarea></label><p><button class="pr">Kaydet</button></p></form></div></div>`;
-  $('#sf2').onsubmit = async (e) => { e.preventDefault(); const d = Object.fromEntries(new FormData(e.target)); try { await api('/settings', { method: 'PUT', body: d }); SS = { ...SS, ...d }; toast('Ayarlar kaydedildi'); } catch (err) { toast(err.message); } };
+  $('#sf2').onsubmit = async (e) => { e.preventDefault(); const d = Object.fromEntries(new FormData(e.target)); try { await api('/settings', { method: 'PUT', body: d }); SS = { ...SS, ...d }; renderFooter(); toast('Ayarlar kaydedildi'); } catch (err) { toast(err.message); } };
 }
 
 // ---------- Yönlendirme ----------
@@ -504,6 +547,7 @@ function route() {
   renderNav();
   if (LB && !document.getElementById('lb')) LB = null;
   document.onkeydown = null;
+  clearInterval(HXT);
   document.querySelectorAll('nav a.l').forEach((a) => a.classList.toggle('on', a.getAttribute('href') === h));
   const m = /^\/ilan\/(\d+)/.exec(h);
   if (m) return detail(m[1]);
@@ -535,9 +579,20 @@ addEventListener('popstate', () => {
   cur = pathOf(); route();
 });
 
+function renderFooter() {
+  const tel = (SS.tel || '').trim(), it = [];
+  if (tel) it.push(`<li><a href="tel:${esc(tel)}">${esc(tel)}</a></li>`);
+  if (SS.mail) it.push(`<li><a href="mailto:${esc(SS.mail)}">${esc(SS.mail)}</a></li>`);
+  if (SS.adr) it.push(`<li><a href="https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(SS.adr)}" target="_blank" rel="noopener">${esc(SS.adr)}</a></li>`);
+  if (SS.saat) it.push(`<li class="mu">${esc(SS.saat)}</li>`);
+  $('#ftc').innerHTML = it.join('') || '<li><a href="/iletisim">İletişim bilgileri</a></li>';
+  $('#fty').textContent = new Date().getFullYear();
+}
+$('#mb').onclick = () => { const o = $('#nav').classList.toggle('open'); $('#mb').setAttribute('aria-expanded', String(o)); document.body.style.overflow = o ? 'hidden' : ''; };
 async function boot(render = true) {
   const [m, s, l] = await Promise.all([api('/me'), api('/settings'), api('/listings')]);
   me = m.user; kurulum = m.kurulum; fotoOk = m.foto; SS = s; L = l.ilanlar; DAN = l.danisman; MY = USERS = null;
+  renderFooter();
   if (render) route(); else renderNav();
 }
 if (location.hash && location.pathname === '/') { try { history.replaceState(null, '', fromHash(location.hash)); } catch {} cur = pathOf(); }
