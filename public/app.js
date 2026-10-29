@@ -21,7 +21,20 @@ let SS = { hero: '', sub: '', tel: '', mail: '', adr: '', saat: '', hak: '' };
 let tab = 'il', W = null, ws = 0;
 let F = { tip: '', q: '', pmin: '', pmax: '', amin: '', amax: '', oda: [], kat: '', as: '', s: '', tur: '', yas: '', oz: [], il: '' };
 const role = () => (!me ? 'v' : me.rol === 'admin' ? 'm' : 'a');
-const own = (l) => !!me && (me.rol === 'admin' || l.u === me.id);
+const canAll = () => !!me && (me.rol === 'admin' || !!me.tumIlan);
+const own = (l) => !!me && (canAll() || l.u === me.id);
+const NO_OFFSET = 100000;
+const setTitle = (t) => { document.title = t ? `${t} | Asya Emlak` : 'Asya Emlak | Satılık ve Kiralık Daire, Villa, Arsa İlanları'; };
+// Favoriler (bu cihazda saklanır)
+let FAV = (() => { try { return (JSON.parse(localStorage.getItem('asya-fav') || '[]') || []).map(Number).filter(Boolean); } catch { return []; } })();
+const saveFav = () => { try { localStorage.setItem('asya-fav', JSON.stringify(FAV)); } catch {} renderNav(); };
+const isFav = (id) => FAV.includes(id);
+function toggleFav(id) {
+  FAV = isFav(id) ? FAV.filter((x) => x !== id) : [id, ...FAV]; saveFav();
+  document.querySelectorAll(`[data-fav="${id}"]`).forEach((b) => { b.classList.toggle('on', isFav(id)); b.setAttribute('aria-pressed', isFav(id)); const sp = b.querySelector('span'); if (sp) sp.textContent = isFav(id) ? 'Favorilerde' : 'Favorilere ekle'; });
+  toast(isFav(id) ? 'Favorilere eklendi' : 'Favorilerden çıkarıldı');
+  if (cur === '/favoriler') favoriler();
+}
 
 // ---------- Yardımcılar ----------
 async function api(path, { method = 'GET', body, raw, type } = {}) {
@@ -45,14 +58,13 @@ const kt = (l) => (l.kat < 0 ? 'Bodrum ' + -l.kat : l.kat == 0 ? 'Zemin kat' : l
 const S = (a, b) => (a === b ? 'selected' : '');
 const yer = (l) => [l.mah, l.ilce, l.il].filter(Boolean).map(esc).join(', ');
 const fiyat = (l) => TL(l.f) + (l.tip === 'Kiralık' ? ' / ay' : '');
-const lk = (id) => location.origin + location.pathname + '#ilan-' + id;
 const mapEmbed = (a, o) => `https://www.openstreetmap.org/export/embed.html?bbox=${o - 0.004},${a - 0.003},${+o + 0.004},${+a + 0.003}&layer=mapnik&marker=${a},${o}`;
 const mapLink = (l) => l.lat
   ? `https://www.google.com/maps/search/?api=1&query=${l.lat},${l.lon}`
   : `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent([l.adr, l.mah, l.ilce, l.il].filter(Boolean).join(', '))}`;
 const loading = (t = 'Yükleniyor…') => { $('#app').innerHTML = `<div class="w"><p class="mu">${t}</p></div>`; };
-const errBox = (m) => { $('#app').innerHTML = `<div class="w"><div class="pn"><p>${esc(m)}</p><a class="tg" href="#ana">Ana sayfaya dön</a></div></div>`; };
-const needLogin = () => { go('#giris'); };
+const errBox = (m) => { $('#app').innerHTML = `<div class="w"><div class="pn"><p>${esc(m)}</p><a class="tg" href="/">Ana sayfaya dön</a></div></div>`; };
+const needLogin = () => { go('/giris', true); };
 
 async function shareIt(title, text, url) {
   try { if (navigator.share) { await navigator.share({ title, text, url }); return; } } catch (e) { if (e && e.name === 'AbortError') return; }
@@ -73,11 +85,14 @@ function renderNav() {
   $('#gl').hidden = r !== 'v';
   $('#hl').hidden = r === 'v';
   if (me) $('#hl').textContent = me.ad.split(' ')[0] || 'Hesabım';
+  $('#pl').textContent = canAll() ? 'İlan yönetimi' : 'İlanlarım';
+  $('#al').textContent = 'Kullanıcılar';
+  const fc = $('#fcn'); if (fc) fc.textContent = FAV.length ? ` (${FAV.length})` : '';
 }
 
 // ---------- Kartlar ----------
 function card(l) {
-  return `<a class="cd" href="#ilan-${l.id}">${ph(l.p[0])}<div class="b"><span class="tg">${esc(l.tip)}</span><div class="pc">${fiyat(l)}</div><div>${esc(l.t)}</div><div class="mu">${yer(l)}</div><div class="sp2"><span>${l.m2} m²</span>${ARSA(l.tur) ? `<span>${esc(l.tur)}</span>` : `<span>${esc(l.oda)}</span><span>${kt(l)}</span><span>${l.as ? 'Asansörlü' : 'Asansörsüz'}</span>`}</div></div></a>`;
+  return `<div class="cdw"><a class="cd" href="${esc(l.url)}">${ph(l.p[0])}<div class="b"><span class="tg">${esc(l.tip)}</span><div class="pc">${fiyat(l)}</div><div>${esc(l.t)}</div><div class="mu">${yer(l)}</div><div class="sp2"><span>${l.m2} m²</span>${ARSA(l.tur) ? `<span>${esc(l.tur)}</span>` : `<span>${esc(l.oda)}</span><span>${kt(l)}</span><span>${l.as ? 'Asansörlü' : 'Asansörsüz'}</span>`}</div></div></a>${favBtn(l)}</div>`;
 }
 
 // ---------- Ana sayfa ----------
@@ -91,8 +106,8 @@ function home() {
   const vc = (c, l) => (l ? `<div class="vc ${c}">${ph(l.p[0])}<div class="b"><b class="pc" style="font-size:15px">${fiyat(l)}</b><br>${esc(l.ilce)}, ${esc(l.il)}</div></div>` : '');
   const yerler = [...new Set(L.map((l) => l.ilce + ', ' + l.il))];
   const ds = yerler.map((x) => `<span>${esc(x)}</span>`).join('');
-  $('#app').innerHTML = `<section class="hero"><i class="ob o1"></i><i class="ob o2"></i><div class="hg"><div><h1>${esc(SS.hero)}</h1><p>${esc(SS.sub)}</p><form class="sr" id="hs"><select name="tip"><option value="">Satılık ve kiralık</option><option>Satılık</option><option>Kiralık</option></select><input name="q" placeholder="Şehir, ilçe veya kelime"><button class="pr">İlanları göster</button></form><div class="st">${n('güncel ilan', a.length)}${n('satılık', a.filter((l) => l.tip === 'Satılık').length)}${n('kiralık', a.filter((l) => l.tip === 'Kiralık').length)}${n('danışman', DAN)}</div></div><div class="vis">${vc('v1', a[0])}${vc('v2', a[1])}${vc('v3', a[2])}</div></div></section>${yerler.length ? `<div class="mq"><div>${ds}${ds}</div></div>` : ''}<div class="w rv"><h2>Öne çıkan ilanlar</h2>${a.length ? `<div class="grid">${a.slice(0, 3).map(card).join('')}</div><p><a class="tg" href="#ilanlar">Tüm ilanları gör</a></p>` : '<div class="pn mu">Henüz yayında ilan yok. Danışmanlarımız ilan ekledikçe burada görünecek.</div>'}</div><div class="w rv"><h2>Neden Asya Emlak?</h2><div class="ft"><div class="pn"><h3>Kontrol edilmiş ilanlar</h3><span class="mu">Her ilan yönetici denetiminden geçer, gerektiğinde yayından kaldırılır.</span></div><div class="pn"><h3>Doğrudan danışman</h3><span class="mu">İlan sahibine telefon, e-posta veya WhatsApp ile tek adımda ulaşın.</span></div><div class="pn"><h3>Net filtreler</h3><span class="mu">Fiyat, alan, oda, kat, bina yaşı ve özelliklerle aradığınızı daraltın.</span></div></div></div><div class="w rv"><div class="pn cta"><div><h2 style="margin:0">Mülkünüzü satmak veya kiralamak mı istiyorsunuz?</h2><span class="mu">Danışmanlarımızla görüşün, size uygun yol haritasını birlikte çıkaralım.</span></div><a class="ba" href="#iletisim">Bize ulaşın</a></div></div>`;
-  $('#hs').onsubmit = (e) => { e.preventDefault(); const d = new FormData(e.target); R(); F.tip = d.get('tip'); F.q = d.get('q'); go('#ilanlar'); };
+  $('#app').innerHTML = `<section class="hero"><i class="ob o1"></i><i class="ob o2"></i><div class="hg"><div><h1>${esc(SS.hero)}</h1><p>${esc(SS.sub)}</p><form class="sr" id="hs"><select name="tip"><option value="">Satılık ve kiralık</option><option>Satılık</option><option>Kiralık</option></select><input name="q" placeholder="Şehir, ilçe, kelime veya ilan no"><button class="pr">İlanları göster</button></form><div class="st">${n('güncel ilan', a.length)}${n('satılık', a.filter((l) => l.tip === 'Satılık').length)}${n('kiralık', a.filter((l) => l.tip === 'Kiralık').length)}${n('danışman', DAN)}</div></div><div class="vis">${vc('v1', a[0])}${vc('v2', a[1])}${vc('v3', a[2])}</div></div></section>${yerler.length ? `<div class="mq"><div>${ds}${ds}</div></div>` : ''}<div class="w rv"><h2>Öne çıkan ilanlar</h2>${a.length ? `<div class="grid">${a.slice(0, 3).map(card).join('')}</div><p><a class="tg" href="/ilanlar">Tüm ilanları gör</a></p>` : '<div class="pn mu">Henüz yayında ilan yok. Danışmanlarımız ilan ekledikçe burada görünecek.</div>'}</div><div class="w rv"><h2>Neden Asya Emlak?</h2><div class="ft"><div class="pn"><h3>Kontrol edilmiş ilanlar</h3><span class="mu">Her ilan yönetici denetiminden geçer, gerektiğinde yayından kaldırılır.</span></div><div class="pn"><h3>Doğrudan danışman</h3><span class="mu">İlan sahibine telefon, e-posta veya WhatsApp ile tek adımda ulaşın.</span></div><div class="pn"><h3>Net filtreler</h3><span class="mu">Fiyat, alan, oda, kat, bina yaşı ve özelliklerle aradığınızı daraltın.</span></div></div></div><div class="w rv"><div class="pn cta"><div><h2 style="margin:0">Mülkünüzü satmak veya kiralamak mı istiyorsunuz?</h2><span class="mu">Danışmanlarımızla görüşün, size uygun yol haritasını birlikte çıkaralım.</span></div><a class="ba" href="/iletisim">Bize ulaşın</a></div></div>`;
+  $('#hs').onsubmit = (e) => { e.preventDefault(); const d = new FormData(e.target), q = String(d.get('q') || '').trim(); const byNo = /^\d{6}$/.test(q) && L.find((l) => String(l.no) === q); if (byNo) return go(byNo.url); R(); F.tip = d.get('tip'); F.q = q; go('/ilanlar'); };
   rv(); cu();
 }
 
@@ -105,7 +120,7 @@ function filt() {
     && (!F.kat || (F.kat === 'z' ? l.kat <= 0 : F.kat === '1' ? l.kat >= 1 && l.kat <= 3 : l.kat >= 4))
     && (!F.yas || (F.yas === '0' ? l.yas <= 5 : F.yas === '1' ? l.yas > 5 && l.yas <= 15 : l.yas > 15))
     && (F.as === '' || String(l.as) === F.as) && oz.every((o) => (l.oz || []).includes(o))
-    && (l.il + ' ' + l.ilce + ' ' + (l.mah || '') + ' ' + l.t).toLocaleLowerCase('tr').includes(q));
+    && (l.il + ' ' + l.ilce + ' ' + (l.mah || '') + ' ' + l.t + ' ' + l.no).toLocaleLowerCase('tr').includes(q));
   if (F.s === 'pa') r.sort((a, b) => a.f - b.f);
   if (F.s === 'pd') r.sort((a, b) => b.f - a.f);
   if (F.s === 'm') r.sort((a, b) => b.m2 - a.m2);
@@ -121,7 +136,7 @@ const chk = (n, a, v) => `<span class="ck">${a.map((o) => `<label><input type="c
 function ilanlar() {
   const rg = (a, b) => `<span class="rg"><input name="${a}" type="number" min="0" placeholder="En az" value="${esc(F[a])}"><input name="${b}" type="number" min="0" placeholder="En çok" value="${esc(F[b])}"></span>`;
   const ils = [...new Set(L.map((l) => l.il))].sort((a, b) => a.localeCompare(b, 'tr')).map((x) => [x, x]);
-  $('#app').innerHTML = `<div class="w"><h2>İlanlar</h2><div class="ly"><div id="rs"></div><aside class="pn fp"><form id="ff"><h4 style="margin-top:0">İlan tipi</h4>${chk('tip', [['Satılık', 'Satılık'], ['Kiralık', 'Kiralık']], [F.tip])}<h4>Emlak türü</h4><select name="tur">${opt([['', 'Tümü'], ...TUR.map((t) => [t, t])], F.tur)}</select><h4>Konum</h4><select name="il">${opt([['', 'Tüm şehirler'], ...ils], F.il)}</select><input name="q" placeholder="İlçe, mahalle veya kelime" value="${esc(F.q)}" style="margin-top:8px"><h4>Fiyat aralığı (₺)</h4>${rg('pmin', 'pmax')}<h4>Brüt alan (m²)</h4>${rg('amin', 'amax')}<h4>Oda sayısı</h4>${chk('oda', [['1', '1+1'], ['2', '2+1'], ['3', '3+1'], ['4', '4+']], F.oda)}<h4>Bina yaşı</h4><select name="yas">${opt([['', 'Fark etmez'], ['0', '0 - 5 yaş'], ['1', '6 - 15 yaş'], ['2', '16 ve üzeri']], F.yas)}</select><h4>Bulunduğu kat</h4><select name="kat">${opt([['', 'Fark etmez'], ['z', 'Zemin / giriş'], ['1', '1 - 3. kat'], ['4', '4. kat ve üzeri']], F.kat)}</select><h4>Asansör</h4><select name="as">${opt([['', 'Fark etmez'], ['1', 'Var'], ['0', 'Yok']], F.as)}</select><h4>Özellikler</h4>${chk('oz', OZ.map((o) => [o, o]), F.oz)}<button type="button" id="fc" style="width:100%;margin-top:18px">Filtreleri temizle</button></form></aside></div></div>`;
+  $('#app').innerHTML = `<div class="w"><h2>İlanlar</h2><div class="ly"><div id="rs"></div><aside class="pn fp"><form id="ff"><h4 style="margin-top:0">İlan tipi</h4>${chk('tip', [['Satılık', 'Satılık'], ['Kiralık', 'Kiralık']], [F.tip])}<h4>Emlak türü</h4><select name="tur">${opt([['', 'Tümü'], ...TUR.map((t) => [t, t])], F.tur)}</select><h4>Konum</h4><select name="il">${opt([['', 'Tüm şehirler'], ...ils], F.il)}</select><input name="q" placeholder="İlçe, mahalle, kelime veya ilan no" value="${esc(F.q)}" style="margin-top:8px"><h4>Fiyat aralığı (₺)</h4>${rg('pmin', 'pmax')}<h4>Brüt alan (m²)</h4>${rg('amin', 'amax')}<h4>Oda sayısı</h4>${chk('oda', [['1', '1+1'], ['2', '2+1'], ['3', '3+1'], ['4', '4+']], F.oda)}<h4>Bina yaşı</h4><select name="yas">${opt([['', 'Fark etmez'], ['0', '0 - 5 yaş'], ['1', '6 - 15 yaş'], ['2', '16 ve üzeri']], F.yas)}</select><h4>Bulunduğu kat</h4><select name="kat">${opt([['', 'Fark etmez'], ['z', 'Zemin / giriş'], ['1', '1 - 3. kat'], ['4', '4. kat ve üzeri']], F.kat)}</select><h4>Asansör</h4><select name="as">${opt([['', 'Fark etmez'], ['1', 'Var'], ['0', 'Yok']], F.as)}</select><h4>Özellikler</h4>${chk('oz', OZ.map((o) => [o, o]), F.oz)}<button type="button" id="fc" style="width:100%;margin-top:18px">Filtreleri temizle</button></form></aside></div></div>`;
   const f = $('#ff');
   f.oninput = f.onchange = () => { const d = new FormData(f), t = d.getAll('tip'); F = { ...F, tip: t.length === 1 ? t[0] : '', tur: d.get('tur'), il: d.get('il'), q: d.get('q'), pmin: d.get('pmin'), pmax: d.get('pmax'), amin: d.get('amin'), amax: d.get('amax'), oda: d.getAll('oda'), yas: d.get('yas'), kat: d.get('kat'), as: d.get('as'), oz: d.getAll('oz') }; rs(); };
   $('#fc').onclick = () => { R(); ilanlar(); };
@@ -129,23 +144,95 @@ function ilanlar() {
 }
 
 // ---------- İlan detayı ----------
-const privBox = (l) => `<div class="pn pvb"><div class="prv" style="margin:0 0 8px"><span>Açık adres</span><b>Sadece siz görüyorsunuz</b></div><p style="margin:0 0 6px">${esc(l.adr) || '<span class="mu">Açık adres girilmemiş.</span>'}</p><p class="mu" style="margin:0">${yer(l)}</p>${l.lat ? `<iframe class="wmap" title="İlan konumu" loading="lazy" src="${mapEmbed(l.lat, l.lon)}"></iframe>` : ''}<div class="sh2"><a href="${mapLink(l)}" target="_blank" rel="noopener"><button type="button" style="width:100%">Haritada aç</button></a><button type="button" id="shl" class="pr">${SHR} Konumu paylaş</button></div>${l.on ? '' : '<p class="mu" style="margin:10px 0 0">Bu ilan şu an yayında değil; ziyaretçiler göremez.</p>'}</div>`;
-async function detail(id) {
-  let l = L.find((x) => x.id == id);
+const HEART = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20.5s-7.5-4.6-9.3-9.4C1.5 7.8 3.8 4.5 7.2 4.5c2 0 3.6 1.1 4.8 2.8 1.2-1.7 2.8-2.8 4.8-2.8 3.4 0 5.7 3.3 4.5 6.6-1.8 4.8-9.3 9.4-9.3 9.4z"/></svg>';
+const PHONE = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 4h4l2 5-2.5 1.5a11 11 0 0 0 5 5L15 13l5 2v4a2 2 0 0 1-2 2A16 16 0 0 1 3 6a2 2 0 0 1 2-2"/></svg>';
+const WAI = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 21l1.6-4.7A8.5 8.5 0 1 1 8 19.6z"/><path d="M9 9.5c.3 2 2.3 4.4 5 5l1.3-1.2 1.7.8-.4 1.6c-3.6.4-8.2-3.6-8.4-7.4L9.8 7.9l.9 1.6z"/></svg>';
+const MAIL = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3 7l9 6 9-6"/></svg>';
+const favBtn = (l, big) => big
+  ? `<button type="button" class="${isFav(l.id) ? 'on' : ''}" data-fav="${l.id}" aria-pressed="${isFav(l.id)}">${HEART}<span>${isFav(l.id) ? 'Favorilerde' : 'Favorilere ekle'}</span></button>`
+  : `<button type="button" class="fav ${isFav(l.id) ? 'on' : ''}" data-fav="${l.id}" aria-pressed="${isFav(l.id)}" aria-label="Favorilere ekle">${HEART}</button>`;
+const tarih = (t) => (t ? new Date(t * 1000).toLocaleDateString('tr-TR', { day: 'numeric', month: 'long', year: 'numeric' }) : '');
+const initials = (ad) => String(ad || '?').split(/\s+/).filter(Boolean).slice(0, 2).map((x) => x[0].toLocaleUpperCase('tr')).join('');
+const privBox = (l) => `<div class="pn pvb"><div class="prv" style="margin:0 0 8px"><span>Açık adres</span><b>${l.u === me.id ? 'Sadece siz görüyorsunuz' : 'Yalnızca yetkililer görür'}</b></div><p style="margin:0 0 6px">${esc(l.adr) || '<span class="mu">Açık adres girilmemiş.</span>'}</p><p class="mu" style="margin:0">${yer(l)}</p>${l.lat ? `<iframe class="wmap" title="İlan konumu" loading="lazy" src="${mapEmbed(l.lat, l.lon)}"></iframe>` : ''}<div class="sh2"><a href="${mapLink(l)}" target="_blank" rel="noopener"><button type="button" style="width:100%">Haritada aç</button></a><button type="button" id="shl" class="pr">${SHR} Konumu paylaş</button></div>${l.on ? '' : '<p class="mu" style="margin:10px 0 0">Bu ilan şu an yayında değil; ziyaretçiler göremez.</p>'}${canEdit(l) ? `<button type="button" class="ed" data-e2="${l.id}" style="width:100%;margin-top:10px">İlanı düzenle</button>` : ''}</div>`;
+const canEdit = (l) => !!me && (canAll() || l.u === me.id);
+let LB = null;
+
+async function detail(no) {
+  const id = Number(no) - NO_OFFSET;
+  let l = L.find((x) => x.id === id);
+  const here = cur;
   if (me || !l) {
     if (!l) loading();
-    try { l = await api('/listings/' + Number(id)); }
-    catch (e) { return errBox(e.status === 404 ? 'İlan bulunamadı ya da yayından kaldırılmış.' : e.message); }
-    if (cur !== 'ilan-' + id) return;
+    try { l = await api('/listings/' + id); }
+    catch (e) { setTitle('İlan bulunamadı'); return errBox(e.status === 404 ? 'İlan bulunamadı ya da yayından kaldırılmış.' : e.message); }
+    if (cur !== here) return;
   }
-  const u = l.sahip || {};
-  let k = 0;
-  const draw = () => { $('#gm').innerHTML = ph(l.p[k]); $('#gt').innerHTML = l.p.map((x, i) => ph(x, i === k ? 'a' : '')).join(''); [...$('#gt').children].forEach((e, i) => (e.onclick = () => { k = i; draw(); })); };
+  if (location.pathname !== l.url) history.replaceState(history.state, '', l.url);
+  cur = l.url;
+  setTitle(`${l.t} – ${fiyat(l)}`);
+  const u = l.sahip || {}, n = l.p.length, ar = ARSA(l.tur);
   const wa = (u.tel || '').replace(/\D/g, '').replace(/^0/, '');
-  $('#app').innerHTML = `<div class="w"><a class="mu" href="#ilanlar">← Tüm ilanlar</a><div class="dt" style="margin-top:12px"><div><div id="gm"></div><div class="th" id="gt"></div><h2 style="margin-top:18px">${esc(l.t)}</h2><div class="pc" style="font-size:26px">${fiyat(l)}</div><div class="sp2"><span>${yer(l)}</span><span>${l.m2} m²</span>${ARSA(l.tur) ? '' : `<span>${esc(l.oda)}</span><span>${kt(l)}</span><span>${l.as ? 'Asansörlü' : 'Asansörsüz'}</span>`}<span>${esc(l.tip)}</span><span>${esc(l.tur)}</span>${ARSA(l.tur) ? '' : `<span>${l.yas ? l.yas + ' yaşında' : 'Yeni bina'}</span>`}</div><div class="sp2">${(l.oz || []).map((o) => `<span class="tg">${esc(o)}</span>`).join('')}</div><p style="white-space:pre-line">${esc(l.d)}</p></div><aside style="align-self:start;display:grid;gap:14px"><div class="pn"><div class="mu">İlan sahibi</div><h3 style="margin:4px 0 12px">${esc(u.ad)}</h3>${u.tel ? `<p style="margin:0 0 6px">Telefon: <a href="tel:${esc(u.tel)}">${esc(u.tel)}</a></p>` : ''}<p style="margin:0 0 14px">E-posta: <a href="mailto:${esc(u.mail)}">${esc(u.mail)}</a></p>${wa ? `<a href="https://wa.me/90${esc(wa)}" target="_blank" rel="noopener"><button class="pr" style="width:100%">WhatsApp ile yaz</button></a>` : ''}<button type="button" id="shr" style="width:100%;margin-top:10px">${SHR} İlanı paylaş</button></div>${own(l) ? privBox(l) : ''}</aside></div></div>`;
-  draw();
-  $('#shr').onclick = () => shareIt(l.t + ' · ' + fiyat(l), [l.mah, l.ilce, l.il].filter(Boolean).join(', '), lk(l.id));
+  const msg = `Merhaba, ${l.no} numaralı "${l.t}" ilanınız hakkında bilgi almak istiyorum. ${location.origin + l.url}`;
+  const facts = [['İlan No', l.no], ['Fiyat', fiyat(l)], [ar ? 'Arsa alanı' : 'Brüt alan', l.m2 + ' m²'],
+    ...(ar ? [] : [['Oda sayısı', l.oda], ['Bulunduğu kat', kt(l)], ['Bina yaşı', l.yas ? l.yas + ' yıl' : 'Yeni bina'], ['Asansör', l.as ? 'Var' : 'Yok']]),
+    ['Emlak türü', l.tur], ['İlan tipi', l.tip], ['İlan tarihi', tarih(l.tarih)]];
+  const m2f = l.tip === 'Satılık' && l.m2 ? `<div class="mu">m² fiyatı ≈ ${TL(Math.round(l.f / l.m2))}</div>` : '';
+  const benzer = L.filter((x) => x.id !== l.id && x.tip === l.tip).sort((a, b) => (b.il === l.il) - (a.il === l.il) || (b.ilce === l.ilce) - (a.ilce === l.ilce)).slice(0, 3);
+  const img = (x, i, lazy) => (typeof x === 'string' ? `<img src="${esc(x)}" alt="${esc(l.t)} – fotoğraf ${i + 1}" ${lazy ? 'loading="lazy"' : ''} decoding="async">` : ph(x));
+  const contact = `<div class="pn"><div class="agent"><div class="av">${esc(initials(u.ad))}</div><div><b>${esc(u.ad)}</b><div class="mu">Asya Emlak danışmanı</div></div></div>${u.tel ? `<a href="tel:${esc(u.tel)}"><button class="pr cbtn">${PHONE} ${esc(u.tel)}</button></a>` : ''}${wa ? `<a href="https://wa.me/90${esc(wa)}?text=${encodeURIComponent(msg)}" target="_blank" rel="noopener"><button class="cbtn wa">${WAI} WhatsApp ile yaz</button></a>` : ''}<a href="mailto:${esc(u.mail)}?subject=${encodeURIComponent('İlan ' + l.no + ': ' + l.t)}&body=${encodeURIComponent(msg)}"><button class="cbtn">${MAIL} E-posta gönder</button></a><p class="mu" style="margin:12px 0 0;text-align:center">Ararken <b>İlan No ${l.no}</b> belirtin.</p></div>`;
+  $('#app').innerHTML = `<div class="w dtw"><div class="bc" role="navigation" aria-label="Konum"><a href="/ilanlar">İlanlar</a><span>›</span><a href="/ilanlar" data-il="${esc(l.il)}">${esc(l.il)}</a><span>›</span><span>${esc(l.ilce)}</span></div>
+  <div class="dt"><div class="dmain">
+   <div class="gal"><div class="gtrack" id="gtr">${l.p.map((x, i) => `<button type="button" class="gsl" data-lb="${i}" aria-label="Fotoğraf ${i + 1} / ${n}, büyüt">${img(x, i, i > 0)}</button>`).join('')}</div>${n > 1 ? `<button type="button" class="gnav gp" data-gd="-1" aria-label="Önceki fotoğraf">‹</button><button type="button" class="gnav gn" data-gd="1" aria-label="Sonraki fotoğraf">›</button>` : ''}<span class="gct" id="gct">1 / ${n}</span>${favBtn(l)}</div>
+   ${n > 1 ? `<div class="gth" id="gth">${l.p.map((x, i) => `<button type="button" data-gi="${i}" class="${i ? '' : 'a'}" aria-label="Fotoğraf ${i + 1}">${img(x, i, true)}</button>`).join('')}</div>` : ''}
+   <div class="dh"><div><div class="sp2" style="margin:0"><span class="tg">${esc(l.tip)}</span><span class="tg">${esc(l.tur)}</span>${l.on ? '' : '<span class="tg" style="border-color:#ff8b8b;color:#ff8b8b">Yayında değil</span>'}</div><h1 class="dtt">${esc(l.t)}</h1><p class="loc">${PIN}${yer(l)}</p></div><div class="dpr"><div class="pc">${fiyat(l)}</div>${m2f}</div></div>
+   <div class="dact">${favBtn(l, true)}<button type="button" id="shr">${SHR}<span>Paylaş</span></button><span class="ino">İlan No <b>${l.no}</b> · ${esc(tarih(l.tarih))}</span></div>
+   <div class="facts">${facts.map(([k, v]) => `<div><span>${k}</span><b>${esc(v)}</b></div>`).join('')}</div>
+   ${(l.oz || []).length ? `<section class="dsec"><h2>Özellikler</h2><div class="sp2">${l.oz.map((o) => `<span class="tg">✓ ${esc(o)}</span>`).join('')}</div></section>` : ''}
+   <section class="dsec"><h2>Açıklama</h2><p class="desc ${String(l.d).length > 600 ? 'clip' : ''}" id="dsc">${esc(l.d)}</p>${String(l.d).length > 600 ? '<button type="button" id="dmore" class="lnk">Devamını oku</button>' : ''}</section>
+  </div>
+  <aside class="asd">${contact}${own(l) ? privBox(l) : ''}</aside></div>
+  ${benzer.length ? `<section class="dsec"><h2>Benzer ilanlar</h2><div class="grid">${benzer.map(card).join('')}</div></section>` : ''}
+  </div>
+  <div class="cbar">${u.tel ? `<a href="tel:${esc(u.tel)}"><button class="pr">${PHONE} Ara</button></a>` : ''}${wa ? `<a href="https://wa.me/90${esc(wa)}?text=${encodeURIComponent(msg)}" target="_blank" rel="noopener"><button class="wa">${WAI} WhatsApp</button></a>` : ''}</div>
+  <div class="lb" id="lb" role="dialog" aria-modal="true" aria-label="Fotoğraflar" hidden><div class="lbtop"><span id="lbc"></span><button type="button" class="lbx" id="lbx" aria-label="Kapat">✕</button></div><div class="lbtr" id="lbtr">${l.p.map((x, i) => `<figure>${img(x, i, true)}</figure>`).join('')}</div>${n > 1 ? `<button type="button" class="gnav gp" data-ld="-1" aria-label="Önceki">‹</button><button type="button" class="gnav gn" data-ld="1" aria-label="Sonraki">›</button>` : ''}</div>`;
+
+  // Galeri
+  const tr = $('#gtr'), ct = $('#gct');
+  const gi = () => Math.round(tr.scrollLeft / Math.max(1, tr.clientWidth));
+  const gto = (i, sm = true) => tr.scrollTo({ left: ((i + n) % n) * tr.clientWidth, behavior: sm ? 'smooth' : 'auto' });
+  let raf = 0;
+  tr.addEventListener('scroll', () => { cancelAnimationFrame(raf); raf = requestAnimationFrame(() => { const i = gi(); ct.textContent = `${i + 1} / ${n}`; document.querySelectorAll('#gth button').forEach((b, k) => b.classList.toggle('a', k === i)); const t = document.querySelector(`#gth button[data-gi="${i}"]`); if (t) t.scrollIntoView({ block: 'nearest', inline: 'nearest' }); }); }, { passive: true });
+  document.querySelectorAll('[data-gd]').forEach((b) => (b.onclick = () => gto(gi() + +b.dataset.gd)));
+  document.querySelectorAll('[data-gi]').forEach((b) => (b.onclick = () => gto(+b.dataset.gi)));
+  // Tam ekran
+  const lb = $('#lb'), lt = $('#lbtr'), lc = $('#lbc');
+  const li = () => Math.round(lt.scrollLeft / Math.max(1, lt.clientWidth));
+  const lto = (i, sm = true) => lt.scrollTo({ left: ((i + n) % n) * lt.clientWidth, behavior: sm ? 'smooth' : 'auto' });
+  lt.addEventListener('scroll', () => { lc.textContent = `${li() + 1} / ${n}`; }, { passive: true });
+  const close = () => { lb.hidden = true; document.body.style.overflow = ''; gto(li(), false); LB = null; };
+  const key = (e) => { if (lb.hidden) return; if (e.key === 'Escape') history.back(); if (e.key === 'ArrowRight') lto(li() + 1); if (e.key === 'ArrowLeft') lto(li() - 1); };
+  LB = null;
+  document.querySelectorAll('[data-lb]').forEach((b) => (b.onclick = () => {
+    lb.hidden = false; document.body.style.overflow = 'hidden'; lto(+b.dataset.lb, false); lc.textContent = `${+b.dataset.lb + 1} / ${n}`;
+    history.pushState({ lb: 1 }, '', location.href); LB = close; $('#lbx').focus();
+  }));
+  $('#lbx').onclick = () => history.back();
+  document.querySelectorAll('[data-ld]').forEach((b) => (b.onclick = () => lto(li() + +b.dataset.ld)));
+  document.onkeydown = key;
+  // Diğer
+  $('#shr').onclick = () => shareIt(l.t + ' · ' + fiyat(l), `İlan No ${l.no} · ${[l.mah, l.ilce, l.il].filter(Boolean).join(', ')}`, location.origin + l.url);
   if ($('#shl')) $('#shl').onclick = () => shareIt('Konum: ' + l.t, l.adr || [l.mah, l.ilce, l.il].join(', '), mapLink(l));
+  if ($('#dmore')) $('#dmore').onclick = (e) => { $('#dsc').classList.remove('clip'); e.target.remove(); };
+  document.querySelectorAll('[data-il]').forEach((a) => (a.onclick = () => { R(); F.il = a.dataset.il; }));
+  document.querySelectorAll('[data-e2]').forEach((b) => (b.onclick = () => { W = { ...blank(), ...JSON.parse(JSON.stringify(l)), _edit: l.id }; ws = 0; go('/panel'); }));
+}
+
+// ---------- Favoriler ----------
+function favoriler() {
+  setTitle('Favorilerim');
+  const list = FAV.map((id) => L.find((l) => l.id === id)).filter(Boolean), kayip = FAV.length - list.length;
+  $('#app').innerHTML = `<div class="w"><h2>Favorilerim</h2><p class="mu" style="margin-top:-6px">Favorileriniz bu cihazda saklanır.</p>${list.length ? `<div class="grid">${list.map(card).join('')}</div>` : '<div class="pn"><p style="margin:0 0 12px">Henüz favori ilanınız yok. İlanlardaki kalp simgesine dokunarak ekleyebilirsiniz.</p><a class="ba" href="/ilanlar">İlanlara göz at</a></div>'}${kayip ? `<p class="mu">${kayip} favori ilan yayından kaldırıldığı için gösterilmiyor. <button type="button" id="fclr" class="lnk">Listeden temizle</button></p>` : ''}</div>`;
+  if ($('#fclr')) $('#fclr').onclick = () => { FAV = FAV.filter((id) => L.some((l) => l.id === id)); saveFav(); favoriler(); };
 }
 
 // ---------- Kurumsal sayfalar ----------
@@ -159,7 +246,7 @@ function contact() {
 
 // ---------- Giriş / kurulum / hesap ----------
 function giris() {
-  if (me) return go('#panel');
+  if (me) return go('/panel', true);
   const kur = kurulum;
   $('#app').innerHTML = `<div class="wz"><h2>${kur ? 'İlk kurulum' : 'Danışman girişi'}</h2><p class="mu" style="margin:0 0 6px">${kur ? 'Henüz hiç kullanıcı yok. Yönetici hesabınızı oluşturun. Bu formu yalnızca bir kez görürsünüz.' : 'İlan eklemek ve yönetmek için hesabınızla giriş yapın.'}</p><form id="lgf" class="pn" style="margin-top:14px">${kur ? `<div class="fld"><span>Kurulum kodu</span><input name="kod" autocomplete="off" required></div><div class="fld"><span>Ad soyad</span><input name="ad" autocomplete="name" required></div><div class="fld"><span>Telefon</span><input name="tel" type="tel" autocomplete="tel" placeholder="05xx xxx xx xx"></div>` : ''}<div class="fld"><span>E-posta</span><input name="mail" type="email" autocomplete="${kur ? 'email' : 'username'}" required></div><div class="fld"><span>Şifre</span><input name="sifre" type="password" autocomplete="${kur ? 'new-password' : 'current-password'}" minlength="${kur ? 8 : 1}" required></div>${kur ? '<div class="fld"><span>Şifre (tekrar)</span><input name="sifre2" type="password" autocomplete="new-password" minlength="8" required></div><p class="mu">En az 8 karakter. Şifreniz sunucuda geri çözülemeyecek şekilde (özetlenerek) saklanır.</p>' : ''}<div class="err" id="lge" role="alert"></div><button class="pr" style="width:100%;padding:14px;font-size:16px;margin-top:6px">${kur ? 'Yönetici hesabını oluştur' : 'Giriş yap'}</button></form></div>`;
   $('#lgf').onsubmit = async (e) => {
@@ -171,17 +258,17 @@ function giris() {
       await api(kur ? '/setup' : '/login', { method: 'POST', body: d });
       await boot(false);
       toast(kur ? 'Yönetici hesabı oluşturuldu' : 'Giriş yapıldı');
-      go('#panel');
+      go('/panel', true);
     } catch (err) { $('#lge').textContent = err.message; btn.disabled = false; }
   };
 }
 
 function hesap() {
   if (!me) return needLogin();
-  $('#app').innerHTML = `<div class="wz"><h2>Hesabım</h2><span class="mu">${esc(me.mail)} · ${me.rol === 'admin' ? 'Yönetici' : 'Danışman'}</span><form id="pf" class="pn" style="margin-top:14px"><h3 style="margin:0">Bilgilerim</h3><p class="mu" style="margin:4px 0 0">İlanlarınızda ziyaretçilere bu ad ve telefon gösterilir.</p><div class="fld"><span>Ad soyad</span><input name="ad" value="${esc(me.ad)}" required></div><div class="fld"><span>Telefon</span><input name="tel" type="tel" value="${esc(me.tel)}"></div><button class="pr" style="margin-top:14px">Kaydet</button></form><form id="pwf" class="pn" style="margin-top:14px"><h3 style="margin:0">Şifre değiştir</h3><div class="fld"><span>Mevcut şifre</span><input name="eski" type="password" autocomplete="current-password" required></div><div class="fld"><span>Yeni şifre</span><input name="yeni" type="password" autocomplete="new-password" minlength="8" required></div><div class="fld"><span>Yeni şifre (tekrar)</span><input name="yeni2" type="password" autocomplete="new-password" minlength="8" required></div><div class="err" id="pwe" role="alert"></div><button class="pr">Şifreyi değiştir</button></form><button id="lo" class="dg" style="width:100%;margin-top:18px;padding:13px">Çıkış yap</button></div>`;
+  $('#app').innerHTML = `<div class="wz"><h2>Hesabım</h2><span class="mu">${esc(me.mail)} · ${me.rol === 'admin' ? 'Yönetici' : me.tumIlan ? 'Yetkili danışman' : 'Danışman'}</span><form id="pf" class="pn" style="margin-top:14px"><h3 style="margin:0">Bilgilerim</h3><p class="mu" style="margin:4px 0 0">İlanlarınızda ziyaretçilere bu ad ve telefon gösterilir.</p><div class="fld"><span>Ad soyad</span><input name="ad" value="${esc(me.ad)}" required></div><div class="fld"><span>Telefon</span><input name="tel" type="tel" value="${esc(me.tel)}"></div><button class="pr" style="margin-top:14px">Kaydet</button></form><form id="pwf" class="pn" style="margin-top:14px"><h3 style="margin:0">Şifre değiştir</h3><div class="fld"><span>Mevcut şifre</span><input name="eski" type="password" autocomplete="current-password" required></div><div class="fld"><span>Yeni şifre</span><input name="yeni" type="password" autocomplete="new-password" minlength="8" required></div><div class="fld"><span>Yeni şifre (tekrar)</span><input name="yeni2" type="password" autocomplete="new-password" minlength="8" required></div><div class="err" id="pwe" role="alert"></div><button class="pr">Şifreyi değiştir</button></form><button id="lo" class="dg" style="width:100%;margin-top:18px;padding:13px">Çıkış yap</button></div>`;
   $('#pf').onsubmit = async (e) => { e.preventDefault(); const d = Object.fromEntries(new FormData(e.target)); try { await api('/profile', { method: 'PUT', body: d }); me.ad = d.ad; me.tel = d.tel; renderNav(); toast('Bilgiler kaydedildi'); } catch (err) { toast(err.message); } };
   $('#pwf').onsubmit = async (e) => { e.preventDefault(); const d = Object.fromEntries(new FormData(e.target)); if (d.yeni !== d.yeni2) return ($('#pwe').textContent = 'Yeni şifreler aynı değil.'); try { await api('/password', { method: 'POST', body: d }); e.target.reset(); $('#pwe').textContent = ''; toast('Şifre değiştirildi. Diğer cihazlardaki oturumlar kapatıldı.'); } catch (err) { $('#pwe').textContent = err.message; } };
-  $('#lo').onclick = async () => { try { await api('/logout', { method: 'POST' }); } catch {} me = null; MY = USERS = null; W = null; renderNav(); toast('Çıkış yapıldı'); go('#ana'); };
+  $('#lo').onclick = async () => { try { await api('/logout', { method: 'POST' }); } catch {} me = null; MY = USERS = null; W = null; renderNav(); toast('Çıkış yapıldı'); go('/'); };
 }
 
 // ---------- İlanlarım ----------
@@ -189,31 +276,48 @@ const gd = () => { try { return JSON.parse(localStorage.getItem('asya-draft') ||
 const draft = () => { try { localStorage.setItem('asya-draft', JSON.stringify({ W, ws })); } catch {} };
 const nod = () => { try { localStorage.removeItem('asya-draft'); } catch {} };
 const blank = () => ({ t: '', tip: 'Satılık', tur: 'Daire', p: [], f: '', m2: '', il: '', ilce: '', mah: '', adr: '', lat: null, lon: null, oda: '2+1', kat: 1, yas: 0, as: 1, oz: [], d: '' });
+let PT = 'mine', PQ = { q: '', sahip: '', durum: '' };
 
 async function panel() {
   if (!me) return needLogin();
   if (W) return wiz();
-  if (!MY) { loading(); try { MY = await api('/my-listings'); } catch (e) { return errBox(e.message); } if (cur !== 'panel') return; }
-  const m = me.rol === 'admin' ? MY.filter((l) => l.u === me.id) : MY, dr = gd();
-  $('#app').innerHTML = `<div class="wz"><h2>İlanlarım</h2><span class="mu">${m.length} ilan · ${m.filter((l) => l.on).length} yayında</span>${!fotoOk ? '<div class="pn dbn" style="border-color:#ff8b8b"><span>Fotoğraf depolama henüz etkin değil; şimdilik yeni ilan eklenemez.</span></div>' : ''}${dr && dr.W ? `<div class="pn dbn"><span>Yarım kalan ilan: <b>${esc(dr.W.t || 'Başlıksız')}</b></span><span><button id="dg" class="pr">Devam et</button> <button id="dx" class="dg">Sil</button></span></div>` : ''}<div class="ml">${m.map((l) => `<div class="mi">${ph(l.p[0])}<div class="in"><div><b>${esc(l.t)}</b></div><div class="pc" style="font-size:15px">${fiyat(l)}</div><div class="mu">${yer(l)} · ${l.on ? 'Yayında' : 'Gizli'}</div><div style="display:flex;gap:6px;margin-top:8px;flex-wrap:wrap"><button data-e="${l.id}">Düzenle</button><button data-g="${l.id}">Gör</button><button data-v="${l.id}">${l.on ? 'Gizle' : 'Yayınla'}</button><button class="dg" data-d="${l.id}">Sil</button></div></div></div>`).join('') || '<div class="pn mu">Henüz ilanınız yok. Sağ alttaki butonla ilk ilanınızı ekleyin.</div>'}</div></div><button class="pr fab" id="nw">+ Yeni ilan</button>`;
+  setTitle('İlanlarım');
+  if (!MY) { loading(); try { MY = await api('/my-listings'); } catch (e) { return errBox(e.message); } if (cur !== '/panel' || W) return; }
+  const all = canAll(), mine = MY.filter((l) => l.u === me.id), dr = gd();
+  if (!all) PT = 'mine';
+  const sahipler = [...new Map(MY.map((l) => [l.u, l.sahip.ad])).entries()].sort((a, b) => String(a[1]).localeCompare(String(b[1]), 'tr'));
+  const q = PQ.q.trim().toLocaleLowerCase('tr');
+  const src = PT === 'all' ? MY : mine;
+  const list = src.filter((l) => (!PQ.sahip || String(l.u) === PQ.sahip) && (!PQ.durum || (PQ.durum === 'on' ? l.on : !l.on))
+    && (!q || (l.t + ' ' + l.no + ' ' + l.il + ' ' + l.ilce + ' ' + (l.mah || '') + ' ' + l.sahip.ad).toLocaleLowerCase('tr').includes(q)));
+  const item = (l) => `<div class="mi">${ph(l.p[0])}<div class="in"><div><b>${esc(l.t)}</b></div><div class="pc" style="font-size:15px">${fiyat(l)}</div><div class="mu">No ${l.no} · ${yer(l)}</div><div class="mu">${PT === 'all' ? esc(l.sahip.ad) + ' · ' : ''}${l.on ? 'Yayında' : '<span style="color:#ff8b8b">Gizli</span>'}</div><div style="display:flex;gap:6px;margin-top:8px;flex-wrap:wrap"><button data-e="${l.id}">Düzenle</button><button data-g="${l.id}">Gör</button><button data-v="${l.id}">${l.on ? 'Gizle' : 'Yayınla'}</button><button class="dg" data-d="${l.id}">Sil</button></div></div></div>`;
+  $('#app').innerHTML = `<div class="wz"><h2>${all ? 'İlan yönetimi' : 'İlanlarım'}</h2>${all ? `<div class="tb" style="margin:6px 0 4px"><button class="${PT === 'mine' ? 'on' : ''}" data-pt="mine">İlanlarım (${mine.length})</button><button class="${PT === 'all' ? 'on' : ''}" data-pt="all">Tüm ilanlar (${MY.length})</button></div>` : `<span class="mu">${mine.length} ilan · ${mine.filter((l) => l.on).length} yayında</span>`}
+  ${!fotoOk ? '<div class="pn dbn" style="border-color:#ff8b8b"><span>Fotoğraf depolama henüz etkin değil; şimdilik yeni ilan eklenemez.</span></div>' : ''}${dr && dr.W ? `<div class="pn dbn"><span>Yarım kalan ilan: <b>${esc(dr.W.t || 'Başlıksız')}</b></span><span><button id="dg" class="pr">Devam et</button> <button id="dx" class="dg">Sil</button></span></div>` : ''}
+  ${src.length > 3 || PQ.q || PQ.sahip || PQ.durum ? `<div class="pflt"><input id="pq" type="search" placeholder="Başlık, ilan no veya konum ara" value="${esc(PQ.q)}">${PT === 'all' ? `<select id="ps"><option value="">Tüm danışmanlar</option>${sahipler.map(([id, ad]) => `<option value="${id}" ${PQ.sahip === String(id) ? 'selected' : ''}>${esc(ad)}</option>`).join('')}</select>` : ''}<select id="pd"><option value="">Tümü</option><option value="on" ${PQ.durum === 'on' ? 'selected' : ''}>Yayında</option><option value="off" ${PQ.durum === 'off' ? 'selected' : ''}>Gizli</option></select></div>` : ''}
+  <div class="ml" id="pml">${list.map(item).join('') || `<div class="pn mu">${src.length ? 'Aramaya uyan ilan yok.' : 'Henüz ilanınız yok. Sağ alttaki butonla ilk ilanınızı ekleyin.'}</div>`}</div></div><button class="pr fab" id="nw">+ Yeni ilan</button>`;
   $('#nw').onclick = () => { W = blank(); ws = 0; wiz(); };
   if ($('#dg')) $('#dg').onclick = () => { W = dr.W; ws = dr.ws || 0; wiz(); };
   if ($('#dx')) $('#dx').onclick = () => { nod(); panel(); };
+  document.querySelectorAll('[data-pt]').forEach((b) => (b.onclick = () => { PT = b.dataset.pt; PQ.sahip = ''; panel(); }));
+  if ($('#pq')) $('#pq').oninput = (e) => { PQ.q = e.target.value; clearTimeout(panel.t); panel.t = setTimeout(() => { panel(); const i = $('#pq'); if (i) { i.focus(); i.setSelectionRange(i.value.length, i.value.length); } }, 250); };
+  if ($('#ps')) $('#ps').onchange = (e) => { PQ.sahip = e.target.value; panel(); };
+  if ($('#pd')) $('#pd').onchange = (e) => { PQ.durum = e.target.value; panel(); };
   bindListingActions(panel);
 }
 
 function bindListingActions(again) {
-  document.querySelectorAll('[data-e]').forEach((b) => (b.onclick = () => { const l = MY.find((x) => x.id == b.dataset.e); W = { ...blank(), ...JSON.parse(JSON.stringify(l)), _edit: l.id }; ws = 0; go('#panel'); }));
-  document.querySelectorAll('[data-g]').forEach((b) => (b.onclick = () => go('#ilan-' + b.dataset.g)));
+  document.querySelectorAll('[data-e]').forEach((b) => (b.onclick = () => { const l = MY.find((x) => x.id == b.dataset.e); W = { ...blank(), ...JSON.parse(JSON.stringify(l)), _edit: l.id }; ws = 0; go('/panel'); }));
+  document.querySelectorAll('[data-g]').forEach((b) => (b.onclick = () => { const l = MY.find((x) => x.id == b.dataset.g); go(l.url); }));
   document.querySelectorAll('[data-v]').forEach((b) => (b.onclick = async () => {
     const l = MY.find((x) => x.id == b.dataset.v); b.disabled = true;
     try { await api('/listings/' + l.id, { method: 'PATCH', body: { on: !l.on } }); l.on = l.on ? 0 : 1; await refreshPublic(); toast(l.on ? 'İlan yayında' : 'İlan gizlendi'); } catch (e) { toast(e.message); }
     again();
   }));
   document.querySelectorAll('[data-d]').forEach((b) => (b.onclick = async () => {
-    if (!confirm('Bu ilan ve fotoğrafları kalıcı olarak silinsin mi?')) return;
+    const l = MY.find((x) => x.id == b.dataset.d);
+    if (!confirm(`"${l.t}" (No ${l.no}) ilanı ve fotoğrafları kalıcı olarak silinsin mi?`)) return;
     b.disabled = true;
-    try { await api('/listings/' + b.dataset.d, { method: 'DELETE' }); MY = MY.filter((x) => x.id != b.dataset.d); await refreshPublic(); toast('İlan silindi'); } catch (e) { toast(e.message); }
+    try { await api('/listings/' + l.id, { method: 'DELETE' }); MY = MY.filter((x) => x.id !== l.id); await refreshPublic(); toast('İlan silindi'); } catch (e) { toast(e.message); }
     again();
   }));
 }
@@ -297,33 +401,33 @@ async function kaydet(btn, er) {
     nod(); W = null; MY = null;
     await refreshPublic();
     toast(nw ? 'İlan yayınlandı' : 'Kaydedildi');
-    go('#ilan-' + l.id);
+    go(l.url);
   } catch (e) {
     btn.disabled = false; btn.textContent = W && W._edit ? 'Kaydet' : 'İlanı yayınla';
-    if (e.status === 401) { toast('Oturumunuz kapanmış. Tekrar giriş yapın; taslağınız saklandı.'); me = null; renderNav(); W = null; return go('#giris'); }
+    if (e.status === 401) { toast('Oturumunuz kapanmış. Tekrar giriş yapın; taslağınız saklandı.'); me = null; renderNav(); W = null; return go('/giris'); }
     er(e.message);
   }
 }
 
 // ---------- Yönetim ----------
+const YETKI = [['danisman', 'Danışman', 'Yalnızca kendi ilanlarını görür ve yönetir.'], ['yetkili', 'Yetkili danışman', 'Tüm ilanları görür, düzenler, gizler ve siler.'], ['admin', 'Yönetici', 'Tüm ilanlar + kullanıcılar ve site ayarları.']];
+const yetkiOf = (u) => (u.rol === 'admin' ? 'admin' : u.tum_ilan ? 'yetkili' : 'danisman');
+const yetkiAd = (y) => (YETKI.find((x) => x[0] === y) || YETKI[0])[1];
 async function admin() {
   if (!me) return needLogin();
   if (me.rol !== 'admin') return errBox('Bu sayfa yalnızca yöneticiler içindir.');
-  if (!MY || !USERS) {
-    loading();
-    try { [MY, USERS] = await Promise.all([api('/my-listings'), api('/users')]); } catch (e) { return errBox(e.message); }
-    if (cur !== 'yonetim') return;
-  }
-  const ul = `<table><tr><th>Ad</th><th>E-posta</th><th>Rol</th><th>İlan</th><th>İşlemler</th></tr>${USERS.map((u) => `<tr><td>${esc(u.ad)}<div class="mu">${esc(u.tel)}</div></td><td>${esc(u.mail)}</td><td>${u.rol === 'admin' ? 'Yönetici' : 'Danışman'}</td><td>${u.ilan}</td><td style="white-space:nowrap">${u.id === me.id ? '<span class="mu">Siz</span>' : `<button data-ua="${u.id}">${u.aktif ? 'Devre dışı bırak' : 'Etkinleştir'}</button> <button data-ur="${u.id}">${u.rol === 'admin' ? 'Danışman yap' : 'Yönetici yap'}</button> <button data-up="${u.id}">Şifre sıfırla</button>`}${u.aktif ? '' : ' <span class="tg" style="border-color:#ff8b8b;color:#ff8b8b">Pasif</span>'}</td></tr>`).join('')}</table><form id="uf" class="pn" style="margin-top:16px"><h3 style="margin:0">Yeni kullanıcı ekle</h3><p class="mu" style="margin:4px 0 0">Belirlediğiniz ilk şifreyi kişiye iletin; giriş yaptıktan sonra Hesabım sayfasından değiştirebilir.</p><div class="fm"><input name="ad" placeholder="Ad soyad" required><input name="mail" type="email" placeholder="E-posta" required><input name="tel" type="tel" placeholder="Telefon"><select name="rol"><option value="danisman">Danışman</option><option value="admin">Yönetici</option></select><input name="sifre" type="password" autocomplete="new-password" minlength="8" placeholder="İlk şifre (en az 8 karakter)" required><button class="pr">Kullanıcı ekle</button></div><div class="err" id="ue" role="alert"></div></form>`;
-  const il = `<table><tr><th>İlan</th><th>Sahip</th><th>Fiyat</th><th>Durum</th><th></th></tr>${MY.map((l) => `<tr><td><a href="#ilan-${l.id}">${esc(l.t)}</a><div class="mu">${yer(l)}</div></td><td>${esc(l.sahip.ad)}</td><td>${fiyat(l)}</td><td>${l.on ? 'Yayında' : 'Gizli'}</td><td style="white-space:nowrap"><button data-e="${l.id}">Düzenle</button> <button data-v="${l.id}">${l.on ? 'Yayından kaldır' : 'Yayınla'}</button> <button class="dg" data-d="${l.id}">Sil</button></td></tr>`).join('') || '<tr><td colspan="5" class="mu">Henüz ilan yok.</td></tr>'}</table>`;
-  $('#app').innerHTML = `<div class="w"><h2>Yönetim</h2><div class="tb"><button class="${tab === 'il' ? 'on' : ''}" data-t="il">İlanlar (${MY.length})</button><button class="${tab === 'us' ? 'on' : ''}" data-t="us">Kullanıcılar (${USERS.length})</button></div><div class="pn tw">${tab === 'il' ? il : ul}</div></div>`;
-  document.querySelectorAll('[data-t]').forEach((b) => (b.onclick = () => { tab = b.dataset.t; admin(); }));
-  bindListingActions(admin);
-  const patch = async (id, body, msg) => { try { await api('/users/' + id, { method: 'PATCH', body }); USERS = await api('/users'); await refreshPublic(); toast(msg); } catch (e) { toast(e.message); } admin(); };
+  setTitle('Kullanıcılar');
+  if (!USERS) { loading(); try { USERS = await api('/users'); } catch (e) { return errBox(e.message); } if (cur !== '/yonetim') return; }
+  const sel = (u) => `<select data-uy="${u.id}" aria-label="${esc(u.ad)} yetkisi">${YETKI.map(([v, t]) => `<option value="${v}" ${yetkiOf(u) === v ? 'selected' : ''}>${t}</option>`).join('')}</select>`;
+  const rows = USERS.map((u) => `<tr><td><b>${esc(u.ad)}</b>${u.aktif ? '' : ' <span class="tg" style="border-color:#ff8b8b;color:#ff8b8b">Pasif</span>'}<div class="mu">${esc(u.mail)}${u.tel ? ' · ' + esc(u.tel) : ''}</div></td><td>${u.id === me.id ? `${yetkiAd(yetkiOf(u))} <span class="mu">(siz)</span>` : sel(u)}</td><td>${u.ilan}</td><td style="white-space:nowrap">${u.id === me.id ? '' : `<button data-ua="${u.id}">${u.aktif ? 'Devre dışı bırak' : 'Etkinleştir'}</button> <button data-up="${u.id}">Şifre sıfırla</button>`}</td></tr>`).join('');
+  $('#app').innerHTML = `<div class="w"><h2>Kullanıcılar</h2><div class="yl">${YETKI.map(([, t, d]) => `<div class="pn"><b>${t}</b><div class="mu">${d}</div></div>`).join('')}</div><div class="pn tw" style="margin-top:14px"><table><tr><th>Kullanıcı</th><th>Yetki</th><th>İlan</th><th></th></tr>${rows}</table></div>
+  <form id="uf" class="pn" style="margin-top:16px"><h3 style="margin:0">Yeni kullanıcı ekle</h3><p class="mu" style="margin:4px 0 0">Belirlediğiniz ilk şifreyi kişiye iletin; giriş yaptıktan sonra Hesabım sayfasından değiştirebilir.</p><div class="fm"><input name="ad" placeholder="Ad soyad" required><input name="mail" type="email" placeholder="E-posta" required><input name="tel" type="tel" placeholder="Telefon"><select name="yetki">${YETKI.map(([v, t]) => `<option value="${v}">${t}</option>`).join('')}</select><input name="sifre" type="password" autocomplete="new-password" minlength="8" placeholder="İlk şifre (en az 8 karakter)" required><button class="pr">Kullanıcı ekle</button></div><div class="err" id="ue" role="alert"></div></form>
+  <p class="mu">Tüm ilanları <a href="/panel" style="color:var(--au)">İlanlarım → Tüm ilanlar</a> sekmesinden yönetebilirsiniz.</p></div>`;
+  const patch = async (id, body, msg) => { try { await api('/users/' + id, { method: 'PATCH', body }); USERS = await api('/users'); MY = null; await refreshPublic(); toast(msg); } catch (e) { toast(e.message); } admin(); };
+  document.querySelectorAll('[data-uy]').forEach((s) => (s.onchange = () => { const u = USERS.find((x) => x.id == s.dataset.uy); if (confirm(`${u.ad} için yetki "${yetkiAd(s.value)}" olarak değiştirilsin mi?`)) patch(u.id, { yetki: s.value }, 'Yetki değiştirildi'); else s.value = yetkiOf(u); }));
   document.querySelectorAll('[data-ua]').forEach((b) => (b.onclick = () => { const u = USERS.find((x) => x.id == b.dataset.ua); patch(u.id, { aktif: !u.aktif }, u.aktif ? 'Kullanıcı devre dışı; ilanları gizlendi' : 'Kullanıcı etkinleştirildi'); }));
-  document.querySelectorAll('[data-ur]').forEach((b) => (b.onclick = () => { const u = USERS.find((x) => x.id == b.dataset.ur); if (confirm(`${u.ad} ${u.rol === 'admin' ? 'danışman' : 'yönetici'} yapılsın mı?`)) patch(u.id, { rol: u.rol === 'admin' ? 'danisman' : 'admin' }, 'Rol değiştirildi'); }));
   document.querySelectorAll('[data-up]').forEach((b) => (b.onclick = () => { const u = USERS.find((x) => x.id == b.dataset.up); const p = prompt(`${u.ad} için yeni şifre (en az 8 karakter). Kişinin açık oturumları kapatılır.`); if (p) patch(u.id, { sifre: p }, 'Şifre sıfırlandı'); }));
-  if ($('#uf')) $('#uf').onsubmit = async (e) => { e.preventDefault(); const d = Object.fromEntries(new FormData(e.target)); try { await api('/users', { method: 'POST', body: d }); USERS = await api('/users'); toast('Kullanıcı eklendi'); admin(); } catch (err) { $('#ue').textContent = err.message; } };
+  $('#uf').onsubmit = async (e) => { e.preventDefault(); const d = Object.fromEntries(new FormData(e.target)); try { await api('/users', { method: 'POST', body: d }); USERS = await api('/users'); toast('Kullanıcı eklendi'); admin(); } catch (err) { $('#ue').textContent = err.message; } };
 }
 
 function settings() {
@@ -335,31 +439,55 @@ function settings() {
 }
 
 // ---------- Yönlendirme ----------
-let cur = location.hash.slice(1) || 'ana';
-function go(h) { cur = String(h).replace(/^#/, '') || 'ana'; try { history.replaceState(null, '', '#' + cur); } catch {} route(); }
+const pathOf = () => location.pathname.replace(/\/+$/, '') || '/';
+const fromHash = (h) => { h = String(h).replace(/^#/, ''); const m = /^ilan-(\d+)$/.exec(h); if (m) return '/ilan/' + (NO_OFFSET + Number(m[1])); return !h || h === 'ana' ? '/' : '/' + h; };
+let cur = pathOf();
+function go(p, replace = false) {
+  p = String(p); if (p.startsWith('#')) p = fromHash(p);
+  if (p !== location.pathname + location.search) { try { history[replace ? 'replaceState' : 'pushState'](null, '', p); } catch {} }
+  cur = pathOf(); route(); scrollTo(0, 0);
+}
 function route() {
   const h = cur;
   renderNav();
-  document.querySelectorAll('nav a.l').forEach((a) => a.classList.toggle('on', a.getAttribute('href') === '#' + h));
-  if (h.startsWith('ilan-')) detail(h.slice(5));
-  else if (h === 'panel') panel();
-  else if (h === 'yonetim') admin();
-  else if (h === 'ayarlar') settings();
-  else if (h === 'ilanlar') ilanlar();
-  else if (h === 'hakkimizda') about();
-  else if (h === 'iletisim') contact();
-  else if (h === 'giris') giris();
-  else if (h === 'hesap') hesap();
-  else home();
-  scrollTo(0, 0);
+  if (LB && !document.getElementById('lb')) LB = null;
+  document.onkeydown = null;
+  document.querySelectorAll('nav a.l').forEach((a) => a.classList.toggle('on', a.getAttribute('href') === h));
+  const m = /^\/ilan\/(\d+)/.exec(h);
+  if (m) return detail(m[1]);
+  if (h === '/') setTitle('');
+  if (h === '/panel') panel();
+  else if (h === '/yonetim') admin();
+  else if (h === '/ayarlar') { setTitle('Site ayarları'); settings(); }
+  else if (h === '/ilanlar') { setTitle('Satılık ve Kiralık İlanlar'); ilanlar(); }
+  else if (h === '/hakkimizda') { setTitle('Hakkımızda'); about(); }
+  else if (h === '/iletisim') { setTitle('İletişim'); contact(); }
+  else if (h === '/favoriler') favoriler();
+  else if (h === '/giris') { setTitle('Danışman girişi'); giris(); }
+  else if (h === '/hesap') { setTitle('Hesabım'); hesap(); }
+  else if (h === '/') home();
+  else { setTitle('Sayfa bulunamadı'); errBox('Aradığınız sayfa bulunamadı.'); }
 }
-document.addEventListener('click', (e) => { const a = e.target.closest && e.target.closest('a[href^="#"]'); if (!a) return; e.preventDefault(); go(a.getAttribute('href')); });
-addEventListener('hashchange', () => { const h = location.hash.slice(1) || 'ana'; if (h !== cur) { cur = h; route(); } });
+document.addEventListener('click', (e) => {
+  const fb = e.target.closest && e.target.closest('[data-fav]');
+  if (fb) { e.preventDefault(); e.stopPropagation(); toggleFav(Number(fb.dataset.fav)); return; }
+  const a = e.target.closest && e.target.closest('a[href]');
+  if (!a || a.target || e.ctrlKey || e.metaKey || e.shiftKey || e.button) return;
+  const href = a.getAttribute('href');
+  if (href.startsWith('#')) { e.preventDefault(); return go(fromHash(href)); }
+  if (!href.startsWith('/') || href.startsWith('//') || href.startsWith('/img/') || /\.[a-z0-9]{2,5}$/i.test(href)) return;
+  e.preventDefault(); go(href);
+});
+addEventListener('popstate', () => {
+  if (LB) { LB(); return; }
+  cur = pathOf(); route();
+});
 
 async function boot(render = true) {
   const [m, s, l] = await Promise.all([api('/me'), api('/settings'), api('/listings')]);
   me = m.user; kurulum = m.kurulum; fotoOk = m.foto; SS = s; L = l.ilanlar; DAN = l.danisman; MY = USERS = null;
   if (render) route(); else renderNav();
 }
-loading();
+if (location.hash && location.pathname === '/') { try { history.replaceState(null, '', fromHash(location.hash)); } catch {} cur = pathOf(); }
+if (!$('#app').children.length) loading();
 boot().catch((e) => errBox(e.message));
