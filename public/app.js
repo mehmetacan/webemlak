@@ -347,11 +347,51 @@ function gps() {
   }, (e) => { b.disabled = false; st.textContent = e.code === 1 ? 'Konum izni verilmedi. Telefon ayarlarından tarayıcıya konum izni verin ya da adresi elle girin.' : 'Konum alınamadı. Açık alanda tekrar deneyin ya da elle girin.'; }, { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 });
 }
 
+// Uygulama içi kamera: bir kez açılır, art arda çekim yapılır
+async function camOpen() {
+  const fallback = () => $('#w-cam') && $('#w-cam').click();
+  if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) return fallback();
+  let stream;
+  try {
+    stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: { ideal: 'environment' }, width: { ideal: 2560 }, height: { ideal: 1920 } }, audio: false });
+  } catch (e) {
+    if (e && e.name === 'NotAllowedError') toast('Kamera izni verilmedi. Telefonun kendi kamerası açılıyor.');
+    return fallback();
+  }
+  const ov = document.createElement('div');
+  ov.className = 'cam'; ov.setAttribute('role', 'dialog'); ov.setAttribute('aria-modal', 'true'); ov.setAttribute('aria-label', 'Kamera');
+  ov.innerHTML = `<video playsinline autoplay muted></video><i class="camfl"></i><div class="camtop"><span id="camc"></span><button type="button" class="lbx" id="camx" aria-label="Kapat">✕</button></div><div class="cambar"><div class="camstrip" id="cams"></div><button type="button" class="shut" id="camsh" aria-label="Fotoğraf çek"></button><button type="button" class="pr camok" id="camok">Bitti</button></div>`;
+  document.body.append(ov); document.body.style.overflow = 'hidden';
+  const v = ov.querySelector('video'); v.srcObject = stream;
+  const upd = () => {
+    ov.querySelector('#camc').textContent = `${W.p.length} / 15 fotoğraf`;
+    ov.querySelector('#cams').innerHTML = W.p.slice(-3).map((x) => `<i style="background-image:url('${x}')"></i>`).join('');
+    ov.querySelector('#camsh').disabled = W.p.length >= 15;
+  };
+  upd();
+  const close = () => { stream.getTracks().forEach((t) => t.stop()); ov.remove(); document.body.style.overflow = ''; LB = null; draft(); wiz(); };
+  try { history.pushState({ cam: 1 }, '', location.href); } catch {}
+  LB = close;
+  ov.querySelector('#camx').onclick = ov.querySelector('#camok').onclick = () => history.back();
+  ov.querySelector('#camsh').onclick = () => {
+    if (W.p.length >= 15) return toast('En fazla 15 fotoğraf ekleyebilirsiniz.');
+    const w = v.videoWidth, h = v.videoHeight; if (!w || !h) return;
+    const k = Math.min(1, 1600 / Math.max(w, h)), c = document.createElement('canvas');
+    c.width = Math.round(w * k); c.height = Math.round(h * k);
+    c.getContext('2d').drawImage(v, 0, 0, c.width, c.height);
+    W.p.push(c.toDataURL('image/jpeg', 0.82));
+    const fl = ov.querySelector('.camfl'); fl.classList.remove('on'); void fl.offsetWidth; fl.classList.add('on');
+    if (navigator.vibrate) navigator.vibrate(25);
+    upd(); draft();
+    if (W.p.length >= 15) toast('15 fotoğraf sınırına ulaşıldı');
+  };
+}
+
 function wiz() {
   const s = ws, ar = ARSA(W.tur);
   let body = '';
   if (s === 0) body = `<h2>İlan başlığı</h2><p class="mu" style="margin:0">Kısa ve dikkat çekici olsun. Örnek: Deniz manzaralı 3+1 daire</p><div class="fld"><input id="w-t" maxlength="80" placeholder="İlan başlığı" value="${esc(W.t)}" enterkeyhint="next"><div class="mu" style="text-align:right;font-size:12px;margin-top:4px"><span id="w-c">${W.t.length}</span>/80</div></div><div class="fld"><span>İlan tipi</span>${ch('tip', ['Satılık', 'Kiralık'])}</div>`;
-  if (s === 1) body = `<h2>Fotoğraflar</h2><p class="mu" style="margin:0">En fazla 15 fotoğraf. İlk fotoğraf vitrin görseli olur.</p>${fotoOk ? '' : '<p class="err">Fotoğraf depolama henüz etkin değil; ilan şu an kaydedilemez.</p>'}<div class="pb"><label>${CAM}Kamerayla çek<input type="file" accept="image/*" capture="environment" id="w-cam"></label><label>${GAL}Galeriden seç<input type="file" accept="image/*" multiple id="w-gal"></label></div><div id="w-st" class="mu" style="margin-top:12px">${W.p.length} / 15 fotoğraf</div><div class="tgrid">${W.p.map((x, i) => `<div class="t" style="background-image:url('${esc(x)}')">${i === 0 ? '<b>Vitrin</b>' : ''}<button type="button" class="x" data-rm="${i}" aria-label="Fotoğrafı kaldır">✕</button>${i ? `<button type="button" class="cv" data-cv="${i}">Vitrin yap</button>` : ''}</div>`).join('')}</div>`;
+  if (s === 1) body = `<h2>Fotoğraflar</h2><p class="mu" style="margin:0">En fazla 15 fotoğraf. İlk fotoğraf vitrin görseli olur.</p>${fotoOk ? '' : '<p class="err">Fotoğraf depolama henüz etkin değil; ilan şu an kaydedilemez.</p>'}<div class="pb"><button type="button" class="pbb" id="w-camb">${CAM}Kamerayla çek<small>Art arda çekin</small></button><label>${GAL}Galeriden seç<small>Birden fazla seçin</small><input type="file" accept="image/*" multiple id="w-gal"></label><input type="file" accept="image/*" capture="environment" multiple id="w-cam" hidden></div><div id="w-st" class="mu" style="margin-top:12px">${W.p.length} / 15 fotoğraf</div><p class="mu" style="font-size:12px;margin:4px 0 0">İpucu: Galeride birden fazla fotoğrafa dokunarak hepsini tek seferde ekleyebilirsiniz. Seçim açılmazsa ilk fotoğrafa basılı tutun.</p><div class="tgrid">${W.p.map((x, i) => `<div class="t" style="background-image:url('${esc(x)}')">${i === 0 ? '<b>Vitrin</b>' : ''}<button type="button" class="x" data-rm="${i}" aria-label="Fotoğrafı kaldır">✕</button>${i ? `<button type="button" class="cv" data-cv="${i}">Vitrin yap</button>` : ''}</div>`).join('')}</div>`;
   if (s === 2) body = `<h2>İlan bilgileri</h2><div class="fld"><span>Emlak türü</span>${ch('tur', TUR)}</div><div class="fld"><span>Fiyat (₺)${W.tip === 'Kiralık' ? ' / aylık' : ''}</span><input id="w-f" inputmode="numeric" placeholder="Örn. 2.500.000" value="${W.f ? Number(W.f).toLocaleString('tr-TR') : ''}"></div><div class="fld"><span>${ar ? 'Arsa alanı' : 'Brüt alan'} (m²)</span><input id="w-m2" inputmode="numeric" placeholder="Örn. 120" value="${W.m2}"></div><div class="fld"><span>Konum</span><button type="button" class="pr gps" id="w-gps">${PIN}Mevcut konumumu kullan</button><div class="mu" id="w-gs" style="margin:8px 0">${W.lat ? 'Konum alındı. Gerekirse aşağıdan düzeltebilirsiniz.' : 'Mülkün yanındaysanız tek dokunuşla adres doldurulur.'}</div><div class="rg"><input id="w-il" placeholder="İl" list="w-ils" value="${esc(W.il)}"><input id="w-ilce" placeholder="İlçe" value="${esc(W.ilce)}"></div><input id="w-mah" placeholder="Mahalle" value="${esc(W.mah)}" style="margin-top:8px"><div class="prv"><span>Açık adres</span><b>Sadece siz görürsünüz</b></div><textarea id="w-adr" rows="2" placeholder="Sokak, bina no, daire (ziyaretçilere gösterilmez)">${esc(W.adr)}</textarea>${W.lat ? `<iframe class="wmap" title="Seçilen konum" loading="lazy" src="${mapEmbed(W.lat, W.lon)}"></iframe>` : ''}<datalist id="w-ils">${[...new Set(['Antalya', 'İstanbul', 'Ankara', 'İzmir', 'Bursa', 'Muğla', 'Mersin', 'Aydın', ...L.map((l) => l.il)])].map((x) => `<option value="${esc(x)}">`).join('')}</datalist></div>` + (ar ? '' : `<div class="fld"><span>Oda sayısı</span>${ch('oda', ['1+0', '1+1', '2+1', '3+1', '4+1', '5+1'])}</div><div class="fld"><span>Bulunduğu kat</span>${stp('kat', -2, 60)}</div><div class="fld"><span>Bina yaşı</span>${stp('yas', 0, 100)}</div><div class="fld"><span>Asansör</span><div class="chips"><button type="button" class="chip ${W.as ? 'on' : ''}" data-as="1">Var</button><button type="button" class="chip ${W.as ? '' : 'on'}" data-as="0">Yok</button></div></div><div class="fld"><span>Özellikler</span><div class="chips">${OZ.map((o) => `<button type="button" class="chip ${W.oz.includes(o) ? 'on' : ''}" data-oz="${o}">${o}</button>`).join('')}</div></div>`);
   if (s === 3) body = `<h2>Açıklama</h2><p class="mu" style="margin:0">Evin öne çıkan yönlerini, çevresini ve ulaşımı anlatın.</p><div class="fld"><textarea id="w-d" rows="8" maxlength="3000" placeholder="Örn. Güney cephe, yeni tadilatlı, okula 5 dakika yürüme mesafesinde...">${esc(W.d)}</textarea></div><div class="pn" style="margin-top:18px"><h3 style="margin:0 0 12px">Özet</h3><dl class="sum"><dt>Başlık</dt><dd>${esc(W.t)}</dd><dt>Tip</dt><dd>${esc(W.tip)} · ${esc(W.tur)}</dd><dt>Fiyat</dt><dd>${W.f ? TL(W.f) : '-'}</dd><dt>Alan</dt><dd>${W.m2 || '-'} m²</dd><dt>Konum</dt><dd>${yer(W)}</dd>${W.adr ? `<dt>Açık adres</dt><dd>${esc(W.adr)} <span class="mu">(sadece siz)</span></dd>` : ''}${ar ? '' : `<dt>Oda</dt><dd>${esc(W.oda)}</dd><dt>Kat</dt><dd>${kv('kat', W.kat)}</dd>`}<dt>Fotoğraf</dt><dd>${W.p.length} adet</dd></dl></div>`;
   $('#app').innerHTML = `<div class="wz"><div class="sh"><span>Adım ${s + 1}/4 · ${STEPS[s]}${W._edit ? ' · Düzenleme' : ''}</span><button type="button" id="w-x" style="padding:6px 12px;font-size:13px">Kapat</button></div><div class="pg"><i style="width:${(s + 1) * 25}%"></i></div>${body}<div class="err" id="w-e" role="alert"></div></div><div class="bar">${s ? '<button type="button" id="w-b">Geri</button>' : ''}<button type="button" class="pr" id="w-n">${s === 3 ? (W._edit ? 'Kaydet' : 'İlanı yayınla') : 'Devam'}</button></div>`;
@@ -364,10 +404,22 @@ function wiz() {
   A.querySelectorAll('[data-cv]').forEach((b) => (b.onclick = () => { wsync(); const [x] = W.p.splice(+b.dataset.cv, 1); W.p.unshift(x); re(); }));
   if ($('#w-t')) $('#w-t').oninput = (e) => { $('#w-c').textContent = e.target.value.length; };
   if ($('#w-f')) $('#w-f').oninput = (e) => { const v = e.target.value.replace(/\D/g, '').slice(0, 12); e.target.value = v ? Number(v).toLocaleString('tr-TR') : ''; };
-  const add = async (fl) => { const room = 15 - W.p.length, fs = [...fl].filter((f) => f.type.startsWith('image/')).slice(0, room); if (!room) return er('En fazla 15 fotoğraf ekleyebilirsiniz.'); if (!fs.length) return; $('#w-st').textContent = `${fs.length} fotoğraf hazırlanıyor…`; for (const f of fs) { const d = await shrink(f); if (d) W.p.push(d); } re(); };
+  const add = async (fl, inp) => {
+    const all = [...fl].filter((f) => f.type.startsWith('image/') || /\.(jpe?g|png|heic|heif|webp)$/i.test(f.name)), room = 15 - W.p.length, fs = all.slice(0, room);
+    if (inp) inp.value = '';
+    if (!room) return er('En fazla 15 fotoğraf ekleyebilirsiniz.');
+    if (!fs.length) return;
+    let ok = 0, bad = 0;
+    for (const [i, f] of fs.entries()) { $('#w-st').textContent = `Fotoğraflar hazırlanıyor ${i + 1} / ${fs.length}…`; const d = await shrink(f); if (d) { W.p.push(d); ok++; } else bad++; }
+    re();
+    if (all.length > room) toast(`En fazla 15 fotoğraf: ${all.length - room} fotoğraf eklenmedi.`);
+    else if (bad) toast(`${bad} fotoğraf okunamadı (desteklenmeyen biçim).`);
+    else if (ok > 1) toast(`${ok} fotoğraf eklendi`);
+  };
   if ($('#w-gps')) $('#w-gps').onclick = () => { wsync(); gps(); };
-  if ($('#w-cam')) $('#w-cam').onchange = (e) => add(e.target.files);
-  if ($('#w-gal')) $('#w-gal').onchange = (e) => add(e.target.files);
+  if ($('#w-cam')) $('#w-cam').onchange = (e) => add(e.target.files, e.target);
+  if ($('#w-gal')) $('#w-gal').onchange = (e) => add(e.target.files, e.target);
+  if ($('#w-camb')) $('#w-camb').onclick = () => { if (W.p.length >= 15) return er('En fazla 15 fotoğraf ekleyebilirsiniz.'); wsync(); camOpen(); };
   $('#w-x').onclick = () => { wsync(); if (!W._edit) { draft(); toast('Taslak kaydedildi'); } W = null; panel(); };
   if ($('#w-b')) $('#w-b').onclick = () => { wsync(); ws--; draft(); wiz(); scrollTo(0, 0); };
   $('#w-n').onclick = async () => {
