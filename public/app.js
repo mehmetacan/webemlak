@@ -19,7 +19,7 @@ const ARSA = (t) => t === 'Tarla' || t === 'Parsel';
 // ---------- Durum ----------
 let me = null, kurulum = false, fotoOk = false;
 let L = [], MY = null, USERS = null;
-let SS = { hero: '', sub: '', tel: '', mail: '', adr: '', saat: '', hak: '', bolge: '' };
+let SS = { hero: '', sub: '', tel: '', mail: '', adr: '', saat: '', hak: '', bolge: '', foto: '' };
 let tab = 'il', W = null, ws = 0;
 let F = { tip: '', q: '', pmin: '', pmax: '', amin: '', amax: '', oda: [], kat: '', as: '', s: '', tur: '', yas: '', oz: [], il: '', du: 'acik' };
 const role = () => (!me ? 'v' : me.rol === 'admin' ? 'm' : 'a');
@@ -74,7 +74,7 @@ function renderNav() {
   document.body.classList.toggle('ekip', r !== 'v');
   $('#pf2').hidden = $('#pl').hidden = r === 'v';
   $('#al').hidden = $('#sl').hidden = r !== 'm';
-  $('#gl').hidden = r !== 'v';
+  $('#gl').hidden = $('#tl').hidden = r !== 'v';
   $('#hl').hidden = r === 'v';
   if (me) $('#hl').textContent = me.ad.split(' ')[0] || 'Hesabım';
   $('#pl').textContent = canAll() ? 'İlan yönetimi' : 'İlanlarım';
@@ -94,33 +94,107 @@ function card(l) {
 }
 
 const R = () => { F = { tip: '', q: '', pmin: '', pmax: '', amin: '', amax: '', oda: [], kat: '', as: '', s: F.s, tur: '', yas: '', oz: [], il: '', du: 'acik' }; };
-// ---------- Ana sayfa (kurumsal tanıtım) ----------
+// ---------- Ana sayfa (talep odaklı, sade) ----------
 const ARR = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" width="16" height="16"><path d="M5 12h14M13 6l6 6-6 6"/></svg>';
-const SVC = [
-  ['Satış danışmanlığı', 'Mülkünüzün doğru fiyatını birlikte belirliyor, ciddi alıcılarla buluşturuyor ve tapuya kadar süreci yönetiyoruz.', '<path d="M4 15L16 5l12 10"/><path d="M7 12.5V27h18V12.5"/><path d="M13 27v-7h6v7"/>'],
-  ['Kiralama danışmanlığı', 'Kiracı adaylarını ön görüşmeyle eliyor, sözleşme ve teslim süreçlerinde ev sahibinin yanında oluyoruz.', '<circle cx="11" cy="16" r="5"/><path d="M16 16h12M24 16v5M28 16v4"/>'],
-  ['Arsa ve tarla', 'İmar durumu, parsel bilgisi ve bölge değerine göre yatırım odaklı arsa ve tarla danışmanlığı veriyoruz.', '<path d="M3 23l8-7 6 5 5-4 7 6"/><path d="M3 27h26"/><path d="M22 5v8M22 5l5 2-5 2"/>'],
-  ['Değerleme ve yetkilendirme', 'Piyasa verisiyle fiyat analizi yapıyor, e-Devlet üzerinden yasal yetkilendirme sürecinde size yol gösteriyoruz.', '<path d="M16 3l11 5v7c0 7-5 12-11 14C10 27 5 22 5 15V8z"/><path d="M11 16l4 4 7-8"/>'],
+const AMAC = [
+  ['al', 'Satın almak', 'Ev ya da arsa arıyorum', '<path d="M4 15L16 5l12 10"/><path d="M7 12.5V27h18V12.5"/><path d="M13 27v-7h6v7"/>'],
+  ['kirala', 'Kiralamak', 'Kiralık ev arıyorum', '<circle cx="11" cy="16" r="5"/><path d="M16 16h12M24 16v5M28 16v4"/>'],
+  ['sat', 'Satmak', 'Mülkümü satmak istiyorum', '<path d="M5 9h14l8 8-10 10-12-12z"/><circle cx="11" cy="14" r="2"/>'],
+  ['kiraver', 'Kiraya vermek', 'Mülkümü kiraya vereceğim', '<rect x="5" y="9" width="22" height="16" rx="3"/><path d="M11 9V6h10v3M5 16h22"/>'],
 ];
-const ADIM = [
-  ['Tanışalım', 'İhtiyacınızı, bütçenizi ve beklentinizi dinliyoruz. Satıyorsanız mülkünüzü yerinde görüyoruz.'],
-  ['Size uygun seçenekler', 'Portföyümüzden ve bölgedeki fırsatlardan yalnızca size uyanları seçiyoruz.'],
-  ['Birebir sunum', 'Fotoğraf, video ve tüm detaylarıyla seçenekleri WhatsApp üzerinden size özel olarak iletiyoruz.'],
-  ['Güvenli süreç', 'Yer gösterme, pazarlık, sözleşme ve tapu işlemlerinde sonuna kadar yanınızdayız.'],
-];
+const svgI = (p, c = '') => `<svg class="${c}" viewBox="0 0 32 32" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">${p}</svg>`;
+const waOfis = () => waNo(SS.tel);
 function home() {
   setTitle('');
-  const tel = (SS.tel || '').trim(), wa = tel.replace(/\D/g, '').replace(/^0/, '').replace(/^90/, '');
+  const tel = (SS.tel || '').trim(), wa = waOfis();
   const bolge = String(SS.bolge || '').split(/[,\n]/).map((x) => x.trim()).filter(Boolean);
   const hak = String(SS.hak || '').split(/\n\s*\n/)[0];
-  const cta = `${wa ? `<a class="hb pr" href="https://wa.me/90${esc(wa)}?text=${encodeURIComponent('Merhaba, emlak danışmanlığı hakkında bilgi almak istiyorum.')}" target="_blank" rel="noopener">${WAI} WhatsApp'tan yazın</a>` : ''}${tel ? `<a class="hb" href="tel:${esc(tel)}">${PHONE} ${esc(tel)}</a>` : ''}${!wa && !tel ? `<a class="hb pr" href="/iletisim">İletişime geçin ${ARR}</a>` : ''}`;
-  $('#app').innerHTML = `${me ? `<div class="ekb"><span>Ekip görünümü: ziyaretçiler bu tanıtım sayfasını görür.</span><a href="/ilanlar">Portföye git ${ARR}</a></div>` : ''}
-  <section class="kh"><div class="khi"><span class="khk">Asya Emlak · Gayrimenkul Danışmanlığı</span><h1>${esc(SS.hero || 'Doğru mülk, güvenilir danışmanlık.')}</h1><p>${esc(SS.sub)}</p><div class="hbs">${cta}</div></div><div class="khv" aria-hidden="true"><img src="/logo.png" alt="" width="300" height="120"></div></section>
-  <section class="sec" id="hizmetler"><div class="sech"><div><h2>Hizmetlerimiz</h2><p>Alım, satım ve kiralamada baştan sona yanınızdayız.</p></div></div><div class="svc">${SVC.map(([t, d, ic]) => `<div class="svi"><svg viewBox="0 0 32 32" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">${ic}</svg><h3>${t}</h3><p>${d}</p></div>`).join('')}</div></section>
-  <section class="sec"><div class="sech"><div><h2>Nasıl çalışıyoruz?</h2><p>Herkese açık ilan yerine size özel, kişisel danışmanlık.</p></div></div><ol class="adm">${ADIM.map(([t, d], i) => `<li><b>${i + 1}</b><div><h3>${t}</h3><p>${d}</p></div></li>`).join('')}</ol></section>
-  ${bolge.length ? `<section class="sec"><div class="sech"><div><h2>Hizmet bölgelerimiz</h2><p>Bu bölgelerdeki konut, villa ve arsalarda deneyimliyiz.</p></div></div><div class="bol">${bolge.map((b) => `<span>${PIN}${esc(b)}</span>`).join('')}</div></section>` : ''}
-  ${hak ? `<section class="sec"><div class="abx"><div><h2>Hakkımızda</h2><p>${esc(hak)}</p><a class="lnk" href="/hakkimizda">Devamını okuyun ${ARR}</a></div></div></section>` : ''}
-  <section class="band"><div class="bandi"><div><h2>Ev mi arıyorsunuz, mülkünüzü mü değerlendirmek istiyorsunuz?</h2><p>Bize ne aradığınızı anlatın; size uygun seçenekleri fotoğraf ve videolarıyla doğrudan iletelim.</p></div><div class="bbtn">${tel ? `<a class="g" href="tel:${esc(tel)}">${PHONE} ${esc(tel)}</a>` : ''}${wa ? `<a class="wa" href="https://wa.me/90${esc(wa)}" target="_blank" rel="noopener">${WAI} WhatsApp ile yazın</a>` : ''}<a href="/iletisim">İletişim bilgileri ${ARR}</a></div></div></section>`;
+  const quick = `<div class="qk"><div class="qkh"><b>Ne yapmak istiyorsunuz?</b><span>Birini seçin, 1 dakikada talebinizi oluşturun.</span></div><div class="qkg">${AMAC.map(([k, t, d, ic]) => `<a class="qki" href="/talep?amac=${k}">${svgI(ic)}<span><b>${t}</b><small>${d}</small></span></a>`).join('')}</div></div>`;
+  $('#app').innerHTML = `${me ? `<div class="ekb"><span>Ekip görünümü: ziyaretçiler bu sayfayı görür.</span><a href="/ilanlar">Portföye git ${ARR}</a></div>` : ''}
+  <section class="h2o ${SS.foto ? 'ft' : ''}"><div class="h2t"><span class="eyb">Asya Emlak · Antalya</span><h1>${esc(SS.hero || 'Aradığınız evi anlatın, biz bulalım.')}</h1><p>${esc(SS.sub)}</p><div class="pls"><a class="pill pr" href="/talep">Talep oluşturun ${ARR}</a>${wa ? `<a class="pill" href="https://wa.me/90${esc(wa)}?text=${encodeURIComponent('Merhaba, bilgi almak istiyorum.')}" target="_blank" rel="noopener">${WAI} WhatsApp</a>` : tel ? `<a class="pill" href="tel:${esc(tel)}">${PHONE} Arayın</a>` : ''}</div></div>
+   <div class="h2r">${SS.foto ? `<div class="h2f" style="background-image:url('${esc(SS.foto)}')" role="img" aria-label="Asya Emlak"></div>` : ''}${quick}</div></section>
+  <section class="s2"><div class="s2h"><span class="eyb">Nasıl çalışıyoruz</span><h2>İlan aramakla uğraşmayın.<br>Ne istediğinizi söyleyin.</h2></div>
+   <div class="stp3">${[['Talebinizi oluşturun', 'Nasıl bir ev, hangi bölge, ne kadar bütçe? Birkaç dokunuşla anlatın.'], ['WhatsApp\'tan bize ulaşsın', 'Talebiniz hazır bir mesaj olarak doğrudan WhatsApp\'ımıza gelir.'], ['Size uygun olanları sunalım', 'Danışmanımız arar, size uyan seçenekleri fotoğraf ve videolarıyla iletir.']].map(([t, d], i) => `<div><b>0${i + 1}</b><h3>${t}</h3><p>${d}</p></div>`).join('')}</div></section>
+  <section class="s2"><div class="s2h"><span class="eyb">Neler yapıyoruz</span><h2>Alırken de satarken de yanınızdayız.</h2></div>
+   <div class="srv">${SVC.map(([t, d, ic]) => `<div>${svgI(ic)}<h3>${t}</h3><p>${d}</p></div>`).join('')}</div></section>
+  ${bolge.length ? `<section class="s2"><div class="s2h"><span class="eyb">Bölgeler</span><h2>Hizmet verdiğimiz yerler</h2></div><div class="bol">${bolge.map((b) => `<span>${PIN}${esc(b)}</span>`).join('')}</div></section>` : ''}
+  ${hak ? `<section class="s2"><div class="hk"><span class="eyb">Hakkımızda</span><p>${esc(hak)}</p><a class="lnk" href="/hakkimizda">Bizi tanıyın ${ARR}</a></div></section>` : ''}
+  <section class="cta2"><div><h2>Hayalinizdeki evi birlikte bulalım.</h2><p>Talebinizi bırakın, sizi arayalım. Hiçbir ücret ya da yükümlülük yok.</p></div><a class="pill pr" href="/talep">Talep oluşturun ${ARR}</a></section>`;
+}
+const SVC = [
+  ['Satış danışmanlığı', 'Mülkünüzün doğru fiyatını belirler, ciddi alıcılarla buluşturur, tapuya kadar süreci yönetiriz.', '<path d="M4 15L16 5l12 10"/><path d="M7 12.5V27h18V12.5"/><path d="M13 27v-7h6v7"/>'],
+  ['Kiralama', 'Kiracı adaylarını ön görüşmeyle eler, sözleşme ve teslimde yanınızda oluruz.', '<circle cx="11" cy="16" r="5"/><path d="M16 16h12M24 16v5M28 16v4"/>'],
+  ['Arsa ve tarla', 'İmar durumu ve bölge değerine göre yatırım odaklı danışmanlık veririz.', '<path d="M3 23l8-7 6 5 5-4 7 6"/><path d="M3 27h26"/><path d="M22 5v8M22 5l5 2-5 2"/>'],
+  ['Değerleme ve yetki', 'Piyasa verisiyle fiyat analizi yapar, e-Devlet yetkilendirmesinde yol gösteririz.', '<path d="M16 3l11 5v7c0 7-5 12-11 14C10 27 5 22 5 15V8z"/><path d="M11 16l4 4 7-8"/>'],
+];
+
+// ---------- Talep oluşturma (WhatsApp'a iletilir, sitede saklanmaz) ----------
+const T_TUR = { al: ['Daire', 'Müstakil ev', 'Villa', 'Dubleks', 'Arsa / tarla', 'Fark etmez'], kirala: ['Daire', 'Müstakil ev', 'Villa', 'Dubleks', 'Fark etmez'], sat: ['Daire', 'Müstakil ev', 'Villa', 'Dubleks', 'Arsa', 'Tarla', 'Dükkan / ofis'], kiraver: ['Daire', 'Müstakil ev', 'Villa', 'Dubleks', 'Dükkan / ofis'] };
+const T_ODA = ['1+0', '1+1', '2+1', '3+1', '4+1 ve üzeri'];
+const T_BUT = { al: ['2 milyon ₺ altı', '2 – 4 milyon ₺', '4 – 7 milyon ₺', '7 – 12 milyon ₺', '12 milyon ₺ üzeri'], kirala: ['15.000 ₺ altı', '15 – 25 bin ₺', '25 – 40 bin ₺', '40 bin ₺ üzeri'] };
+const T_OZ = ['Asansör', 'Otopark', 'Site içinde', 'Balkon', 'Bahçe', 'Eşyalı', 'Havuz', 'Manzara', 'Okula yakın', 'Ulaşıma yakın'];
+const T_ZAMAN = ['Hemen', '1 – 3 ay içinde', 'Acelem yok'];
+let TQ = null, TS = 0;
+const tNew = (amac = '') => ({ amac, tur: [], oda: [], bolge: '', butce: '', butceX: '', m2: '', oz: [], zaman: '', ad: '', not: '' });
+const isAra = () => TQ.amac === 'al' || TQ.amac === 'kirala';
+function talepMesaj() {
+  const a = AMAC.find((x) => x[0] === TQ.amac), ara = isAra(), l = [];
+  l.push(`Merhaba Asya Emlak, sitenizden talep oluşturdum.`, '');
+  l.push(`🏠 *${a ? a[1] : ''}*`);
+  if (TQ.tur.length) l.push(`• Tür: ${TQ.tur.join(', ')}`);
+  if (TQ.oda.length) l.push(`• Oda: ${TQ.oda.join(', ')}`);
+  if (TQ.bolge.trim()) l.push(`• ${ara ? 'Bölge' : 'Konum'}: ${TQ.bolge.trim()}`);
+  if (TQ.m2) l.push(`• Alan: ${ara ? 'en az ' : ''}${TQ.m2} m²`);
+  const b = TQ.butceX.trim() || TQ.butce;
+  if (b) l.push(`• ${ara ? 'Bütçe' : 'Beklenen fiyat'}: ${b}${/^\d[\d.]*$/.test(b) ? ' ₺' : ''}`);
+  if (TQ.oz.length) l.push(`• ${ara ? 'Olmazsa olmaz' : 'Özellikler'}: ${TQ.oz.join(', ')}`);
+  if (TQ.zaman) l.push(`• Zaman: ${TQ.zaman}`);
+  if (TQ.not.trim()) l.push('', `📝 ${TQ.not.trim()}`);
+  if (TQ.ad.trim()) l.push('', `Adım: ${TQ.ad.trim()}`);
+  return l.join('\n');
+}
+function talep() {
+  setTitle('Talep oluşturun');
+  if (!TQ) { const q = new URLSearchParams(location.search).get('amac'); TQ = tNew(AMAC.some((x) => x[0] === q) ? q : ''); TS = TQ.amac ? 1 : 0; }
+  const ara = isAra(), wa = waOfis(), N = 4;
+  const ck = (k, arr, multi = true) => `<div class="chips tch">${arr.map((v) => `<button type="button" class="chip ${(Array.isArray(TQ[k]) ? TQ[k].includes(v) : TQ[k] === v) ? 'on' : ''}" data-tk="${k}" data-tv="${esc(v)}" data-tm="${multi ? 1 : 0}">${esc(v)}</button>`).join('')}</div>`;
+  const evMi = !TQ.tur.some((t) => /Arsa|Tarla|Dükkan/.test(t)) || TQ.tur.length > 1;
+  let body = '';
+  if (TS === 0) body = `<h1 class="tq">Ne yapmak istiyorsunuz?</h1><p class="tqs">Size en doğru şekilde yardımcı olabilmemiz için seçin.</p><div class="tam">${AMAC.map(([k, t, d, ic]) => `<button type="button" class="${TQ.amac === k ? 'on' : ''}" data-am="${k}">${svgI(ic)}<span><b>${t}</b><small>${d}</small></span></button>`).join('')}</div>`;
+  if (TS === 1) body = `<h1 class="tq">${ara ? 'Nasıl bir yer arıyorsunuz?' : 'Mülkünüzü kısaca tanıyalım'}</h1><p class="tqs">${ara ? 'Birden fazla seçebilirsiniz.' : 'Tahmini bilgiler yeterli.'}</p><div class="tf"><span>Emlak türü</span>${ck('tur', T_TUR[TQ.amac], ara)}</div>${evMi ? `<div class="tf"><span>Oda sayısı</span>${ck('oda', T_ODA, ara)}</div>` : ''}<div class="tf"><span>${ara ? 'En az kaç m²? (isteğe bağlı)' : 'Yaklaşık kaç m²? (isteğe bağlı)'}</span><input id="t-m2" inputmode="numeric" maxlength="7" placeholder="Örn. 120" value="${esc(TQ.m2)}"></div>`;
+  if (TS === 2) body = `<h1 class="tq">${ara ? 'Nerede ve hangi bütçeyle?' : 'Nerede ve ne fiyata?'}</h1><p class="tqs">${ara ? 'Birden fazla bölge yazabilirsiniz.' : 'Fiyatı bilmiyorsanız boş bırakın, birlikte belirleyelim.'}</p><div class="tf"><span>${ara ? 'Tercih ettiğiniz bölgeler' : 'Mülkün bulunduğu yer'}</span><input id="t-bolge" maxlength="200" placeholder="${ara ? 'Örn. Konyaaltı, Lara, Kepez Varsak' : 'Örn. Kepez, Kültür Mahallesi'}" value="${esc(TQ.bolge)}" enterkeyhint="next"></div>${ara ? `<div class="tf"><span>Bütçe${TQ.amac === 'kirala' ? ' (aylık)' : ''}</span>${ck('butce', T_BUT[TQ.amac], false)}<input id="t-bx" inputmode="numeric" maxlength="20" placeholder="ya da tutarı yazın" value="${esc(TQ.butceX)}" style="margin-top:10px"></div>` : `<div class="tf"><span>Beklediğiniz fiyat (isteğe bağlı)</span><input id="t-bx" inputmode="numeric" maxlength="20" placeholder="Örn. 4.500.000" value="${esc(TQ.butceX)}"></div>`}<div class="tf"><span>Ne zaman?</span>${ck('zaman', T_ZAMAN, false)}</div>`;
+  if (TS === 3) body = `<h1 class="tq">${ara ? 'Sizin için önemli olanlar' : 'Son birkaç detay'}</h1><p class="tqs">İsteğe bağlı; atlayabilirsiniz.</p>${evMi ? `<div class="tf"><span>${ara ? 'Olmazsa olmazlar' : 'Mülkün özellikleri'}</span>${ck('oz', T_OZ)}</div>` : ''}<div class="tf"><span>Eklemek istedikleriniz</span><textarea id="t-not" rows="3" maxlength="600" placeholder="${ara ? 'Örn. Evcil hayvanımız var, kat bahçesi tercih ederiz.' : 'Örn. Tapusu hazır, krediye uygun, hafta sonu gösterilebilir.'}">${esc(TQ.not)}</textarea></div><div class="tf"><span>Adınız</span><input id="t-ad" maxlength="60" autocomplete="name" placeholder="Size nasıl hitap edelim?" value="${esc(TQ.ad)}"></div><div class="tpv"><span>WhatsApp mesajınız</span><pre id="t-pv">${esc(talepMesaj())}</pre></div><p class="tkv">🔒 Bilgileriniz sitemizde saklanmaz; mesaj kendi WhatsApp'ınızdan doğrudan bize iletilir.</p>`;
+  $('#app').innerHTML = `<div class="tw2"><div class="tpg"><i style="width:${((TS + 1) / N) * 100}%"></i></div><div class="tst">Adım ${TS + 1} / ${N}</div>${body}<div class="err" id="t-e" role="alert"></div></div>
+   <div class="tbar">${TS ? '<button type="button" class="pill" id="t-b">Geri</button>' : '<span></span>'}${TS < 3 ? `<button type="button" class="pill pr" id="t-n" ${TS === 0 && !TQ.amac ? 'disabled' : ''}>Devam ${ARR}</button>` : wa ? `<a class="pill wa" id="t-go" href="https://wa.me/90${esc(wa)}?text=${encodeURIComponent(talepMesaj())}" target="_blank" rel="noopener">${WAI} WhatsApp ile gönder</a>` : `<a class="pill pr" id="t-go" href="${SS.mail ? `mailto:${esc(SS.mail)}?subject=${encodeURIComponent('Emlak talebi')}&body=${encodeURIComponent(talepMesaj())}` : '/iletisim'}">Gönder ${ARR}</a>`}</div>`;
+  const A = $('#app'), sync = () => {
+    const g = (i) => document.getElementById(i);
+    if (g('t-m2')) TQ.m2 = g('t-m2').value.replace(/\D/g, '');
+    if (g('t-bolge')) TQ.bolge = g('t-bolge').value;
+    if (g('t-bx')) { const v = g('t-bx').value.replace(/[^\d]/g, ''); TQ.butceX = v ? Number(v).toLocaleString('tr-TR') : ''; }
+    if (g('t-not')) TQ.not = g('t-not').value;
+    if (g('t-ad')) TQ.ad = g('t-ad').value;
+  };
+  const pv = () => { sync(); const p = $('#t-pv'); if (p) p.textContent = talepMesaj(); const go = $('#t-go'); if (go && go.href.startsWith('https://wa.me')) go.href = `https://wa.me/90${wa}?text=${encodeURIComponent(talepMesaj())}`; };
+  A.querySelectorAll('[data-am]').forEach((b) => (b.onclick = () => { if (TQ.amac !== b.dataset.am) { const ad = TQ.ad; TQ = tNew(b.dataset.am); TQ.ad = ad; } TS = 1; talep(); scrollTo(0, 0); }));
+  A.querySelectorAll('[data-tk]').forEach((b) => (b.onclick = () => {
+    sync(); const k = b.dataset.tk, v = b.dataset.tv;
+    if (b.dataset.tm === '1') { if (v === 'Fark etmez') TQ[k] = TQ[k].includes(v) ? [] : [v]; else TQ[k] = TQ[k].includes(v) ? TQ[k].filter((x) => x !== v) : [...TQ[k].filter((x) => x !== 'Fark etmez'), v]; }
+    else if (Array.isArray(TQ[k])) TQ[k] = TQ[k][0] === v ? [] : [v];
+    else { TQ[k] = TQ[k] === v ? '' : v; if (k === 'butce') TQ.butceX = ''; }
+    if (k === 'tur' && !isAra()) TQ.oda = [];
+    const y = scrollY; talep(); scrollTo(0, y);
+  }));
+  A.querySelectorAll('input,textarea').forEach((i) => (i.oninput = pv));
+  if ($('#t-bx')) $('#t-bx').onchange = () => { pv(); if (TQ.butceX && TQ.butce) { TQ.butce = ''; A.querySelectorAll('[data-tk=butce]').forEach((c) => c.classList.remove('on')); } $('#t-bx').value = TQ.butceX; };
+  if ($('#t-m2')) $('#t-m2').oninput = (e) => { e.target.value = e.target.value.replace(/\D/g, ''); pv(); };
+  if ($('#t-b')) $('#t-b').onclick = () => { sync(); TS--; talep(); scrollTo(0, 0); };
+  if ($('#t-n')) $('#t-n').onclick = () => {
+    sync();
+    if (TS === 1 && !TQ.tur.length) return ($('#t-e').textContent = 'Lütfen emlak türünü seçin.');
+    if (TS === 2 && !TQ.bolge.trim()) { $('#t-bolge').focus(); return ($('#t-e').textContent = isAra() ? 'Lütfen en az bir bölge yazın.' : 'Lütfen mülkün bulunduğu yeri yazın.'); }
+    TS++; talep(); scrollTo(0, 0);
+  };
+  if ($('#t-go')) $('#t-go').onclick = () => { pv(); setTimeout(() => toast('Teşekkürler! Mesajı WhatsApp\'ta göndermeyi unutmayın.'), 400); };
 }
 
 // ---------- İlanlar ve filtre ----------
@@ -821,7 +895,10 @@ function settings() {
   if (!me) return needLogin();
   if (me.rol !== 'admin') return errBox('Bu sayfa yalnızca yöneticiler içindir.');
   const f = (k, l) => `<label>${l}<input name="${k}" value="${esc(SS[k])}"></label>`;
-  $('#app').innerHTML = `<div class="w"><h2>Site ayarları</h2><div class="pn"><form id="sf2"><div class="fm">${f('hero', 'Ana sayfa başlığı')}${f('sub', 'Ana sayfa alt metni')}${f('bolge', 'Hizmet bölgeleri (virgülle ayırın)')}${f('tel', 'Telefon')}${f('mail', 'E-posta')}${f('adr', 'Adres (haritada gösterilir)')}${f('saat', 'Çalışma saatleri')}</div><label class="mu" style="display:grid;gap:4px;margin-top:12px">Hakkımızda metni (paragraflar arasında boş satır bırakın)<textarea name="hak" style="min-height:160px">${esc(SS.hak)}</textarea></label><p><button class="pr">Kaydet</button></p></form></div></div>`;
+  $('#app').innerHTML = `<div class="w"><h2>Site ayarları</h2><div class="pn"><form id="sf2"><div class="fm">${f('hero', 'Ana sayfa başlığı (örn. Aradığınız evi anlatın, biz bulalım.)')}${f('sub', 'Ana sayfa alt metni')}${f('bolge', 'Hizmet bölgeleri (virgülle ayırın)')}${f('tel', 'Telefon')}${f('mail', 'E-posta')}${f('adr', 'Adres (haritada gösterilir)')}${f('saat', 'Çalışma saatleri')}</div><div class="mu" style="margin-top:14px">Ana sayfa görseli (isteğe bağlı; yatay bir ofis ya da ev fotoğrafı)</div><div class="sfo">${SS.foto ? `<img src="${esc(SS.foto)}" alt="">` : '<span class="mu">Görsel yok</span>'}<label class="pill">${SS.foto ? 'Değiştir' : 'Görsel seç'}<input type="file" accept="image/*" id="sfi" hidden></label>${SS.foto ? '<button type="button" class="pill" id="sfx">Kaldır</button>' : ''}</div><label class="mu" style="display:grid;gap:4px;margin-top:12px">Hakkımızda metni (paragraflar arasında boş satır bırakın)<textarea name="hak" style="min-height:160px">${esc(SS.hak)}</textarea></label><p><button class="pr">Kaydet</button></p></form></div></div>`;
+  const setFoto = async (v) => { try { await api('/settings', { method: 'PUT', body: { foto: v } }); SS.foto = v; toast(v ? 'Görsel kaydedildi' : 'Görsel kaldırıldı'); settings(); } catch (err) { toast(err.message); } };
+  $('#sfi').onchange = async (e) => { const f = e.target.files[0]; if (!f) return; toast('Görsel yükleniyor…'); const d = await shrink(f); if (!d) return toast('Görsel okunamadı'); try { const r = await api('/photos', { method: 'POST', raw: await (await fetch(d)).blob(), type: 'image/jpeg' }); await setFoto(r.url); } catch (err) { toast(err.message); } };
+  if ($('#sfx')) $('#sfx').onclick = () => setFoto('');
   $('#sf2').onsubmit = async (e) => { e.preventDefault(); const d = Object.fromEntries(new FormData(e.target)); try { await api('/settings', { method: 'PUT', body: d }); SS = { ...SS, ...d }; renderFooter(); toast('Ayarlar kaydedildi'); } catch (err) { toast(err.message); } };
 }
 
@@ -849,6 +926,7 @@ function route() {
   else if (h === '/yonetim') admin();
   else if (h === '/ayarlar') { setTitle('Site ayarları'); settings(); }
   else if (h === '/ilanlar') { setTitle('Portföy'); ilanlar(); }
+  else if (h === '/talep') { if (new URLSearchParams(location.search).get('amac')) TQ = null; talep(); }
   else if (h === '/hakkimizda') { setTitle('Hakkımızda'); about(); }
   else if (h === '/iletisim') { setTitle('İletişim'); contact(); }
   else if (h === '/giris') { setTitle('Ekip girişi'); giris(); }

@@ -12,18 +12,19 @@ const LOGIN_WINDOW_SEC = 15 * 60;
 const TIPLER = ['Satılık', 'Kiralık'];
 const TURLER = ['Daire', 'Müstakil', 'Villa', 'Dubleks', 'Tarla', 'Parsel'];
 const OZELLIKLER = ['Balkon', 'Otopark', 'Eşyalı', 'Güvenlik', 'Havuz'];
-const AYAR_ANAHTARLARI = ['hero', 'sub', 'tel', 'mail', 'adr', 'saat', 'hak', 'bolge'];
+const AYAR_ANAHTARLARI = ['hero', 'sub', 'tel', 'mail', 'adr', 'saat', 'hak', 'bolge', 'foto'];
 const DURUMLAR = ['aktif', 'opsiyon', 'satildi', 'kiralandi', 'pasif'];
 const PAYLASIM_GUN = [1, 3, 7, 15, 30];
 const AYAR_VARSAYILAN = {
-  hero: 'Doğru mülk, güvenilir danışmanlık.',
-  sub: 'Satılık ve kiralık konut, villa ve arsa için ihtiyacınızı dinliyor, size uygun mülkleri birebir sunuyoruz.',
+  hero: 'Aradığınız evi anlatın, biz bulalım.',
+  sub: 'Nasıl bir ev istediğinizi birkaç dokunuşla anlatın; size uygun seçenekleri danışmanımız WhatsApp\'tan iletsin.',
   tel: '',
   mail: '',
   adr: '',
   saat: 'Hafta içi 09:00 - 18:00',
   hak: 'Asya Emlak, alıcı ve kiracıları doğru mülkle buluşturmak için çalışan bir emlak danışmanlığı firmasıdır.',
   bolge: '',
+  foto: '',
 };
 
 class HttpError extends Error {
@@ -377,7 +378,7 @@ async function api(req, env, url) {
     requireAdmin(user);
     const b = await body();
     const stmts = AYAR_ANAHTARLARI.filter((k) => k in b).map((k) =>
-      env.DB.prepare('INSERT OR REPLACE INTO settings (k, v) VALUES (?, ?)').bind(k, str(b[k], k === 'hak' ? 5000 : k === 'bolge' ? 1000 : 300))
+      env.DB.prepare('INSERT OR REPLACE INTO settings (k, v) VALUES (?, ?)').bind(k, k === 'foto' ? (b.foto ? (keyFromUrl(b.foto) ? imgUrl(keyFromUrl(b.foto)) : (() => { throw new HttpError(400, 'Görsel geçersiz.'); })()) : '') : str(b[k], k === 'hak' ? 5000 : k === 'bolge' ? 1000 : 300))
     );
     if (stmts.length) await env.DB.batch(stmts);
     return json({ ok: true });
@@ -628,7 +629,11 @@ async function renderPage(req, env, url) {
     desc = clip(`${S.hero} ${S.sub}`, 160);
     ld.push(agentLd(S, base));
     const bolge = String(S.bolge || '').split(/[,\n]/).map((x) => x.trim()).filter(Boolean);
-    body = `<section class="w"><h1>${h(S.hero)}</h1><p>${h(S.sub)}</p><h2>Hizmetlerimiz</h2><ul><li>Satış danışmanlığı</li><li>Kiralama danışmanlığı</li><li>Arsa ve tarla danışmanlığı</li><li>Değerleme ve e-Devlet yetkilendirme desteği</li></ul>${bolge.length ? `<h2>Hizmet bölgelerimiz</h2><p>${bolge.map(h).join(', ')}</p>` : ''}${S.tel ? `<p>Telefon: ${h(S.tel)}</p>` : ''}</section>`;
+    body = `<section class="w"><h1>${h(S.hero)}</h1><p>${h(S.sub)}</p><p><a href="/talep">Talep oluşturun</a></p><h2>Hizmetlerimiz</h2><ul><li>Satış danışmanlığı</li><li>Kiralama danışmanlığı</li><li>Arsa ve tarla danışmanlığı</li><li>Değerleme ve e-Devlet yetkilendirme desteği</li></ul>${bolge.length ? `<h2>Hizmet bölgelerimiz</h2><p>${bolge.map(h).join(', ')}</p>` : ''}${S.tel ? `<p>Telefon: ${h(S.tel)}</p>` : ''}</section>`;
+  } else if (path === '/talep') {
+    title = `Ev talebi oluşturun | ${SITE_NAME}`;
+    desc = 'Satın almak, kiralamak, satmak ya da kiraya vermek için talebinizi 1 dakikada oluşturun; WhatsApp ile doğrudan Asya Emlak\'a iletin.';
+    body = '<section class="w"><h1>Talep oluşturun</h1><p>Nasıl bir ev aradığınızı, bölgenizi ve bütçenizi anlatın; talebiniz WhatsApp ile bize iletilsin.</p></section>';
   } else if (/^\/ilan\/\d+/.test(path)) {
     // İlan sayfaları yalnızca ekip içindir; içerik sunucuda yazılmaz, arama motorlarına kapalıdır.
     title = `İlan | ${SITE_NAME}`; desc = S.sub; index = false;
@@ -681,7 +686,7 @@ async function renderPage(req, env, url) {
 
 async function sitemap(env, url) {
   const base = baseUrl(env, url);
-  const urls = [['/', '1.0'], ['/hakkimizda', '0.6'], ['/iletisim', '0.6']];
+  const urls = [['/', '1.0'], ['/talep', '0.9'], ['/hakkimizda', '0.6'], ['/iletisim', '0.6']];
   const xml = `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${urls.map(([p, pr]) =>
     `<url><loc>${h(base + p)}</loc><priority>${pr}</priority></url>`).join('\n')}\n</urlset>`;
   return new Response(xml, { headers: { 'content-type': 'application/xml; charset=utf-8', 'cache-control': 'public, max-age=600' } });
