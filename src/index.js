@@ -12,15 +12,18 @@ const LOGIN_WINDOW_SEC = 15 * 60;
 const TIPLER = ['Satılık', 'Kiralık'];
 const TURLER = ['Daire', 'Müstakil', 'Villa', 'Dubleks', 'Tarla', 'Parsel'];
 const OZELLIKLER = ['Balkon', 'Otopark', 'Eşyalı', 'Güvenlik', 'Havuz'];
-const AYAR_ANAHTARLARI = ['hero', 'sub', 'tel', 'mail', 'adr', 'saat', 'hak'];
+const AYAR_ANAHTARLARI = ['hero', 'sub', 'tel', 'mail', 'adr', 'saat', 'hak', 'bolge'];
+const DURUMLAR = ['aktif', 'opsiyon', 'satildi', 'kiralandi', 'pasif'];
+const PAYLASIM_GUN = [1, 3, 7, 15, 30];
 const AYAR_VARSAYILAN = {
-  hero: 'Yaşamak istediğiniz evi birlikte bulalım.',
-  sub: 'Asya Emlak danışmanlarının güncel ilanlarını konuma, fiyata, odaya ve kata göre saniyeler içinde filtreleyin.',
+  hero: 'Doğru mülk, güvenilir danışmanlık.',
+  sub: 'Satılık ve kiralık konut, villa ve arsa için ihtiyacınızı dinliyor, size uygun mülkleri birebir sunuyoruz.',
   tel: '',
   mail: '',
   adr: '',
   saat: 'Hafta içi 09:00 - 18:00',
   hak: 'Asya Emlak, alıcı ve kiracıları doğru mülkle buluşturmak için çalışan bir emlak danışmanlığı firmasıdır.',
+  bolge: '',
 };
 
 class HttpError extends Error {
@@ -190,11 +193,11 @@ function toFront(r, withPrivate) {
     id: r.id, no: ilanNo(r.id), url: ilanPath(r.id, r.baslik), u: r.user_id, t: r.baslik, tip: r.tip, tur: r.tur, f: r.fiyat, m2: r.m2,
     il: r.il, ilce: r.ilce, mah: r.mah, oda: r.oda, kat: r.kat, yas: r.yas, as: r.asansor,
     oz: JSON.parse(r.ozellik || '[]'), d: r.aciklama,
-    p: JSON.parse(r.fotolar || '[]').map(imgUrl), v: r.video ? imgUrl(r.video) : '', on: r.yayinda,
-    tarih: r.olusturma,
+    p: JSON.parse(r.fotolar || '[]').map(imgUrl), v: r.video ? imgUrl(r.video) : '', durum: r.durum || 'aktif',
+    tarih: r.olusturma, gun: r.guncelleme,
     sahip: { ad: r.sahip_ad, tel: r.sahip_tel, mail: r.sahip_mail },
   };
-  if (withPrivate) Object.assign(o, { adr: r.adres, lat: r.lat, lon: r.lon });
+  if (withPrivate) Object.assign(o, { adr: r.adres, lat: r.lat, lon: r.lon, ms: r.mal_sahibi, mt: r.mal_tel, yb: r.yetki_bitis, nt: r.notlar, priv: 1 });
   return o;
 }
 
@@ -234,6 +237,11 @@ function parseListing(b) {
     aciklama: str(b.d, 3000, { name: 'Açıklama' }) || 'Detaylı bilgi için danışmanımızla iletişime geçin.',
     fotolar: JSON.stringify(p),
     video: (() => { if (!b.v) return ''; const k = vidKey(b.v); if (!k) throw new HttpError(400, 'Video geçersiz.'); return k; })(),
+    durum: DURUMLAR.includes(b.durum) ? b.durum : 'aktif',
+    mal_sahibi: str(b.ms, 100, { name: 'Mal sahibi' }),
+    mal_tel: str(b.mt, 30, { name: 'Mal sahibi telefonu' }),
+    yetki_bitis: (() => { const y = str(b.yb, 10); if (y && !/^\d{4}-\d{2}-\d{2}$/.test(y)) throw new HttpError(400, 'Yetki bitiş tarihi geçersiz.'); return y; })(),
+    notlar: str(b.nt, 2000, { name: 'Notlar' }),
   };
 }
 
@@ -247,6 +255,17 @@ async function getListingRow(env, id) {
 async function deletePhotos(env, keys) {
   if (!env.FOTO || !keys.length) return;
   await env.FOTO.delete(keys);
+}
+
+async function sharedListing(env, token) {
+  const p = await env.DB.prepare(`SELECT p.*, u.ad, u.tel, u.mail, u.aktif FROM paylasim p JOIN users u ON u.id = p.user_id WHERE p.token_hash = ?`)
+    .bind(await sha256(token)).first();
+  if (!p) return { status: 404, hata: 'Bağlantı bulunamadı.' };
+  if (p.bitis < now()) return { status: 410, hata: 'Bu bağlantının süresi dolmuş. Güncel bilgi için danışmanınızla iletişime geçin.' };
+  const row = await getListingRow(env, p.listing_id);
+  if (!row || !['aktif', 'opsiyon'].includes(row.durum || 'aktif') || !p.aktif)
+    return { status: 410, hata: 'Bu ilan artık geçerli değil. Benzer seçenekler için danışmanınızla iletişime geçin.' };
+  return { p, row };
 }
 
 // ---------- API ----------
@@ -358,19 +377,18 @@ async function api(req, env, url) {
     requireAdmin(user);
     const b = await body();
     const stmts = AYAR_ANAHTARLARI.filter((k) => k in b).map((k) =>
-      env.DB.prepare('INSERT OR REPLACE INTO settings (k, v) VALUES (?, ?)').bind(k, str(b[k], k === 'hak' ? 5000 : 300))
+      env.DB.prepare('INSERT OR REPLACE INTO settings (k, v) VALUES (?, ?)').bind(k, str(b[k], k === 'hak' ? 5000 : k === 'bolge' ? 1000 : 300))
     );
     if (stmts.length) await env.DB.batch(stmts);
     return json({ ok: true });
   }
 
   // --- İlanlar ---
+  // İlanlar kamuya açık değildir: yalnızca giriş yapmış ekip üyeleri portföyü görür.
   if (path === '/listings' && method === 'GET') {
-    const { results } = await env.DB.prepare(
-      `${LISTING_SELECT} WHERE l.yayinda = 1 AND u.aktif = 1 ORDER BY l.olusturma DESC LIMIT 1000`
-    ).all();
-    const d = await env.DB.prepare(`SELECT COUNT(*) AS n FROM users WHERE aktif = 1 AND rol = 'danisman'`).first();
-    return json({ ilanlar: results.map((r) => toFront(r, false)), danisman: d.n });
+    requireUser(user);
+    const { results } = await env.DB.prepare(`${LISTING_SELECT} ORDER BY l.olusturma DESC LIMIT 2000`).all();
+    return json({ ilanlar: results.map((r) => toFront(r, canManage(user, r))) });
   }
 
   if (path === '/my-listings' && method === 'GET') {
@@ -385,8 +403,9 @@ async function api(req, env, url) {
   if ((m = /^\/listings\/(\d+)$/.exec(path))) {
     const id = Number(m[1]);
     const row = await getListingRow(env, id);
+    requireUser(user);
     const manage = row && canManage(user, row);
-    if (!row || ((!row.yayinda || !row.sahip_aktif) && !manage)) throw new HttpError(404, 'İlan bulunamadı.');
+    if (!row) throw new HttpError(404, 'İlan bulunamadı.');
 
     if (method === 'GET') return json(toFront(row, manage));
     if (!manage) throw new HttpError(403, 'Bu ilanı değiştirme yetkiniz yok.');
@@ -395,9 +414,11 @@ async function api(req, env, url) {
       const v = parseListing(await body());
       await env.DB.prepare(
         `UPDATE listings SET baslik=?, tip=?, tur=?, fiyat=?, m2=?, il=?, ilce=?, mah=?, adres=?, lat=?, lon=?,
-         oda=?, kat=?, yas=?, asansor=?, ozellik=?, aciklama=?, fotolar=?, video=?, guncelleme=? WHERE id=?`
+         oda=?, kat=?, yas=?, asansor=?, ozellik=?, aciklama=?, fotolar=?, video=?, durum=?, mal_sahibi=?, mal_tel=?,
+         yetki_bitis=?, notlar=?, guncelleme=? WHERE id=?`
       ).bind(v.baslik, v.tip, v.tur, v.fiyat, v.m2, v.il, v.ilce, v.mah, v.adres, v.lat, v.lon,
-        v.oda, v.kat, v.yas, v.asansor, v.ozellik, v.aciklama, v.fotolar, v.video, now(), id).run();
+        v.oda, v.kat, v.yas, v.asansor, v.ozellik, v.aciklama, v.fotolar, v.video, v.durum, v.mal_sahibi, v.mal_tel,
+        v.yetki_bitis, v.notlar, now(), id).run();
       const eski = JSON.parse(row.fotolar || '[]'), yeni = JSON.parse(v.fotolar);
       const sil = eski.filter((k) => !yeni.includes(k));
       if (row.video && row.video !== v.video) sil.push(row.video);
@@ -406,15 +427,60 @@ async function api(req, env, url) {
     }
     if (method === 'PATCH') {
       const b = await body();
-      await env.DB.prepare('UPDATE listings SET yayinda = ?, guncelleme = ? WHERE id = ?')
-        .bind(b.on ? 1 : 0, now(), id).run();
+      if (!DURUMLAR.includes(b.durum)) throw new HttpError(400, 'Durum geçersiz.');
+      await env.DB.prepare('UPDATE listings SET durum = ?, guncelleme = ? WHERE id = ?').bind(b.durum, now(), id).run();
       return json({ ok: true });
     }
     if (method === 'DELETE') {
-      await env.DB.prepare('DELETE FROM listings WHERE id = ?').bind(id).run();
+      await env.DB.batch([env.DB.prepare('DELETE FROM paylasim WHERE listing_id = ?').bind(id), env.DB.prepare('DELETE FROM listings WHERE id = ?').bind(id)]);
       await deletePhotos(env, [...JSON.parse(row.fotolar || '[]'), ...(row.video ? [row.video] : [])]);
       return json({ ok: true });
     }
+  }
+
+  // --- Müşteriye özel, süreli paylaşım bağlantıları ---
+  if ((m = /^\/listings\/(\d+)\/paylas$/.exec(path))) {
+    requireUser(user);
+    const id = Number(m[1]);
+    const row = await getListingRow(env, id);
+    if (!row) throw new HttpError(404, 'İlan bulunamadı.');
+    if (method === 'POST') {
+      if (!['aktif', 'opsiyon'].includes(row.durum || 'aktif')) throw new HttpError(400, 'Yalnızca aktif veya opsiyonlu ilanlar paylaşılabilir.');
+      const b = await body();
+      const gun = PAYLASIM_GUN.includes(Number(b.gun)) ? Number(b.gun) : 7;
+      const token = b64url(crypto.getRandomValues(new Uint8Array(18)));
+      const bitis = now() + gun * 86400;
+      await env.DB.prepare('INSERT INTO paylasim (token_hash, listing_id, user_id, musteri, bitis, olusturma) VALUES (?,?,?,?,?,?)')
+        .bind(await sha256(token), id, user.id, str(b.musteri, 80, { name: 'Müşteri' }), bitis, now()).run();
+      return json({ url: '/p/' + token, bitis }, 201);
+    }
+    if (method === 'GET') {
+      const all = canManage(user, row);
+      const { results } = await env.DB.prepare(
+        `SELECT p.id, p.musteri, p.bitis, p.goruntulenme, p.son_gorulme, p.olusturma, p.user_id, u.ad FROM paylasim p JOIN users u ON u.id = p.user_id
+         WHERE p.listing_id = ? ${all ? '' : 'AND p.user_id = ?'} ORDER BY p.olusturma DESC LIMIT 50`
+      ).bind(...(all ? [id] : [id, user.id])).all();
+      return json(results.map((r) => ({ id: r.id, musteri: r.musteri, bitis: r.bitis, gor: r.goruntulenme, son: r.son_gorulme, tarih: r.olusturma, ad: r.ad, benim: r.user_id === user.id })));
+    }
+  }
+  if ((m = /^\/paylasim\/(\d+)$/.exec(path)) && method === 'DELETE') {
+    requireUser(user);
+    const p = await env.DB.prepare('SELECT p.*, l.user_id AS sahip FROM paylasim p JOIN listings l ON l.id = p.listing_id WHERE p.id = ?').bind(Number(m[1])).first();
+    if (!p) throw new HttpError(404, 'Bağlantı bulunamadı.');
+    if (p.user_id !== user.id && !canAll(user) && p.sahip !== user.id) throw new HttpError(403, 'Bu bağlantıyı iptal etme yetkiniz yok.');
+    await env.DB.prepare('UPDATE paylasim SET bitis = ? WHERE id = ?').bind(now() - 1, p.id).run();
+    return json({ ok: true });
+  }
+  // Müşterinin açtığı bağlantı: yalnızca vitrin bilgileri (açık adres, mal sahibi, notlar asla gönderilmez)
+  if ((m = /^\/p\/([A-Za-z0-9_-]{16,40})$/.exec(path)) && method === 'GET') {
+    const r = await sharedListing(env, m[1]);
+    if (!r.row) throw new HttpError(r.status, r.hata);
+    await env.DB.prepare('UPDATE paylasim SET goruntulenme = goruntulenme + 1, son_gorulme = ? WHERE id = ?').bind(now(), r.p.id).run();
+    const o = toFront(r.row, false);
+    delete o.u; delete o.url; delete o.id;
+    o.sahip = { ad: r.p.ad, tel: r.p.tel, mail: r.p.mail };
+    o.bitis = r.p.bitis;
+    return json(o);
   }
 
   if (path === '/listings' && method === 'POST') {
@@ -423,10 +489,11 @@ async function api(req, env, url) {
     const t = now();
     const r = await env.DB.prepare(
       `INSERT INTO listings (user_id, baslik, tip, tur, fiyat, m2, il, ilce, mah, adres, lat, lon, oda, kat, yas,
-       asansor, ozellik, aciklama, fotolar, video, yayinda, olusturma, guncelleme)
-       VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,1,?,?)`
+       asansor, ozellik, aciklama, fotolar, video, durum, mal_sahibi, mal_tel, yetki_bitis, notlar, yayinda, olusturma, guncelleme)
+       VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,0,?,?)`
     ).bind(user.id, v.baslik, v.tip, v.tur, v.fiyat, v.m2, v.il, v.ilce, v.mah, v.adres, v.lat, v.lon,
-      v.oda, v.kat, v.yas, v.asansor, v.ozellik, v.aciklama, v.fotolar, v.video, t, t).run();
+      v.oda, v.kat, v.yas, v.asansor, v.ozellik, v.aciklama, v.fotolar, v.video, v.durum, v.mal_sahibi, v.mal_tel,
+      v.yetki_bitis, v.notlar, t, t).run();
     return json(toFront(await getListingRow(env, r.meta.last_row_id), true), 201);
   }
 
@@ -528,7 +595,7 @@ const h = (v) => String(v ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<'
 const ldJson = (o) => `<script type="application/ld+json">${JSON.stringify(o).replace(/</g, '\\u003c')}</script>`;
 const trPrice = (n) => Number(n).toLocaleString('tr-TR') + ' ₺';
 const clip = (t, n) => { const s = String(t || '').replace(/\s+/g, ' ').trim(); return s.length > n ? s.slice(0, n - 1).replace(/\s+\S*$/, '') + '…' : s; };
-const APP_PAGES = { '/favoriler': 'Favorilerim', '/giris': 'Danışman girişi', '/panel': 'İlanlarım', '/hesap': 'Hesabım', '/yonetim': 'Yönetim', '/ayarlar': 'Site ayarları' };
+const APP_PAGES = { '/giris': 'Danışman girişi', '/panel': 'İlan yönetimi', '/ilanlar': 'Portföy', '/hesap': 'Hesabım', '/yonetim': 'Kullanıcılar', '/ayarlar': 'Site ayarları' };
 
 async function siteSettings(env) {
   const { results } = await env.DB.prepare('SELECT k, v FROM settings').all();
@@ -557,42 +624,23 @@ async function renderPage(req, env, url) {
   const ld = [];
   let m;
   if (path === '/') {
-    title = `${SITE_NAME} | Satılık ve Kiralık Daire, Villa, Arsa İlanları`;
-    desc = clip(S.sub || S.hero, 160);
+    title = `${SITE_NAME} | Emlak Danışmanlığı – Satılık ve Kiralık Konut, Villa, Arsa`;
+    desc = clip(`${S.hero} ${S.sub}`, 160);
     ld.push(agentLd(S, base));
-    const { results } = await env.DB.prepare(`${LISTING_SELECT} WHERE l.yayinda = 1 AND u.aktif = 1 ORDER BY l.olusturma DESC LIMIT 12`).all();
-    body = `<section class="w"><h1>${h(S.hero)}</h1><p>${h(S.sub)}</p><h2>Son ilanlar</h2><ul>${results.map((r) => `<li><a href="${ilanPath(r.id, r.baslik)}">${h(r.baslik)} – ${trPrice(r.fiyat)}</a></li>`).join('')}</ul></section>`;
-  } else if (path === '/ilanlar') {
-    const { results } = await env.DB.prepare(`${LISTING_SELECT} WHERE l.yayinda = 1 AND u.aktif = 1 ORDER BY l.olusturma DESC LIMIT 500`).all();
-    title = `Satılık ve Kiralık Emlak İlanları | ${SITE_NAME}`;
-    desc = `${SITE_NAME} güncel ${results.length} ilan: satılık ve kiralık daire, müstakil ev, villa, tarla ve parsel. Fiyat, m², oda ve konuma göre filtreleyin.`;
-    body = `<section class="w"><h1>Emlak ilanları</h1><ul>${results.map((r) => `<li><a href="${ilanPath(r.id, r.baslik)}">${h(r.baslik)}</a> – ${h(factLine(r))} – ${trPrice(r.fiyat)}</li>`).join('')}</ul></section>`;
-  } else if ((m = /^\/ilan\/(\d+)(?:-[a-z0-9-]*)?$/.exec(path))) {
-    const id = Number(m[1]) - NO_OFFSET;
-    const r = id > 0 ? await env.DB.prepare(`${LISTING_SELECT} WHERE l.id = ? AND l.yayinda = 1 AND u.aktif = 1`).bind(id).first() : null;
-    if (!r) {
-      status = 404; index = false; title = `İlan bulunamadı | ${SITE_NAME}`; desc = 'Aradığınız ilan yayından kaldırılmış olabilir.';
-      body = '<section class="w"><h1>İlan bulunamadı</h1><p>Bu ilan yayından kaldırılmış olabilir. <a href="/ilanlar">Tüm ilanlara göz atın</a>.</p></section>';
-    } else {
-      const cpath = ilanPath(r.id, r.baslik);
-      if (cpath !== path) return Response.redirect(url.origin + cpath + url.search, 301);
-      canon = base + cpath;
-      const fotolar = JSON.parse(r.fotolar || '[]').map((k) => base + imgUrl(k));
-      const yer = [r.mah, r.ilce, r.il].filter(Boolean).join(', ');
-      title = `${r.baslik} – ${trPrice(r.fiyat)}${r.tip === 'Kiralık' ? '/ay' : ''} | ${SITE_NAME}`;
-      desc = clip(`${r.tip} ${r.tur.toLocaleLowerCase('tr')}, ${r.m2} m²${r.oda && r.oda !== '-' ? ', ' + r.oda : ''}, ${yer}. ${r.aciklama}`, 160);
-      img = fotolar[0] || null; type = 'article';
-      ld.push({
-        '@context': 'https://schema.org', '@type': 'RealEstateListing', name: r.baslik, description: clip(r.aciklama, 500),
-        url: canon, image: fotolar, datePosted: new Date(r.olusturma * 1000).toISOString(), identifier: String(ilanNo(r.id)),
-        offers: { '@type': 'Offer', price: r.fiyat, priceCurrency: 'TRY', availability: 'https://schema.org/InStock', businessFunction: r.tip === 'Kiralık' ? 'http://purl.org/goodrelations/v1#LeaseOut' : 'http://purl.org/goodrelations/v1#Sell' },
-        contentLocation: { '@type': 'Place', address: { '@type': 'PostalAddress', addressLocality: r.ilce, addressRegion: r.il, addressCountry: 'TR', ...(r.mah ? { streetAddress: r.mah } : {}) } },
-        floorSize: { '@type': 'QuantitativeValue', value: r.m2, unitCode: 'MTK' },
-      });
-      ld.push({ '@context': 'https://schema.org', '@type': 'BreadcrumbList', itemListElement: [
-        { '@type': 'ListItem', position: 1, name: 'İlanlar', item: base + '/ilanlar' },
-        { '@type': 'ListItem', position: 2, name: r.baslik, item: canon }] });
-      body = `<article class="w"><p><a href="/ilanlar">İlanlar</a> / ${h(r.il)} / ${h(r.ilce)}</p><h1>${h(r.baslik)}</h1><p><strong>${trPrice(r.fiyat)}${r.tip === 'Kiralık' ? ' / ay' : ''}</strong> · İlan No ${ilanNo(r.id)}</p><p>${h(factLine(r))}</p>${img ? `<img src="${h(img)}" alt="${h(r.baslik)}" width="800">` : ''}<p>${h(r.aciklama)}</p><p>Danışman: ${h(r.sahip_ad)}</p></article>`;
+    const bolge = String(S.bolge || '').split(/[,\n]/).map((x) => x.trim()).filter(Boolean);
+    body = `<section class="w"><h1>${h(S.hero)}</h1><p>${h(S.sub)}</p><h2>Hizmetlerimiz</h2><ul><li>Satış danışmanlığı</li><li>Kiralama danışmanlığı</li><li>Arsa ve tarla danışmanlığı</li><li>Değerleme ve e-Devlet yetkilendirme desteği</li></ul>${bolge.length ? `<h2>Hizmet bölgelerimiz</h2><p>${bolge.map(h).join(', ')}</p>` : ''}${S.tel ? `<p>Telefon: ${h(S.tel)}</p>` : ''}</section>`;
+  } else if (/^\/ilan\/\d+/.test(path)) {
+    // İlan sayfaları yalnızca ekip içindir; içerik sunucuda yazılmaz, arama motorlarına kapalıdır.
+    title = `İlan | ${SITE_NAME}`; desc = S.sub; index = false;
+  } else if ((m = /^\/p\/([A-Za-z0-9_-]{16,40})$/.exec(path))) {
+    index = false; canon = base + path;
+    const r = await sharedListing(env, m[1]);
+    if (!r.row) { status = r.status; title = `Bağlantı geçersiz | ${SITE_NAME}`; desc = r.hata; }
+    else {
+      const f = JSON.parse(r.row.fotolar || '[]');
+      title = `${r.row.baslik} – ${trPrice(r.row.fiyat)}${r.row.tip === 'Kiralık' ? '/ay' : ''}`;
+      desc = clip(`${factLine(r.row)}. ${SITE_NAME} danışmanınız ${r.p.ad} tarafından size özel paylaşıldı.`, 160);
+      img = f[0] ? base + imgUrl(f[0]) : null;
     }
   } else if (path === '/hakkimizda') {
     title = `Hakkımızda | ${SITE_NAME}`; desc = clip(S.hak, 160); ld.push(agentLd(S, base));
@@ -612,7 +660,7 @@ async function renderPage(req, env, url) {
     `<title>${h(title)}</title>`,
     `<meta name="description" content="${h(desc)}">`,
     `<meta name="robots" content="${robots}">`,
-    status === 200 ? `<link rel="canonical" href="${h(canon)}">` : '',
+    status === 200 && index ? `<link rel="canonical" href="${h(canon)}">` : '',
     `<meta property="og:site_name" content="${SITE_NAME}">`,
     `<meta property="og:locale" content="tr_TR">`,
     `<meta property="og:type" content="${type}">`,
@@ -633,20 +681,16 @@ async function renderPage(req, env, url) {
 
 async function sitemap(env, url) {
   const base = baseUrl(env, url);
-  const { results } = await env.DB.prepare(`SELECT l.id, l.baslik, l.guncelleme FROM listings l JOIN users u ON u.id = l.user_id
-    WHERE l.yayinda = 1 AND u.aktif = 1 ORDER BY l.guncelleme DESC LIMIT 45000`).all();
-  const d = (t) => new Date(t * 1000).toISOString().slice(0, 10);
-  const urls = [['/', null, '1.0'], ['/ilanlar', results[0] ? d(results[0].guncelleme) : null, '0.9'], ['/hakkimizda', null, '0.4'], ['/iletisim', null, '0.4'],
-    ...results.map((r) => [ilanPath(r.id, r.baslik), d(r.guncelleme), '0.8'])];
-  const xml = `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${urls.map(([p, lm, pr]) =>
-    `<url><loc>${h(base + p)}</loc>${lm ? `<lastmod>${lm}</lastmod>` : ''}<priority>${pr}</priority></url>`).join('\n')}\n</urlset>`;
+  const urls = [['/', '1.0'], ['/hakkimizda', '0.6'], ['/iletisim', '0.6']];
+  const xml = `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${urls.map(([p, pr]) =>
+    `<url><loc>${h(base + p)}</loc><priority>${pr}</priority></url>`).join('\n')}\n</urlset>`;
   return new Response(xml, { headers: { 'content-type': 'application/xml; charset=utf-8', 'cache-control': 'public, max-age=600' } });
 }
 
 function robotsTxt(env, url) {
   const base = baseUrl(env, url);
   const txt = isCanonicalHost(env, url)
-    ? `User-agent: *\nDisallow: /api/\nDisallow: /panel\nDisallow: /giris\nDisallow: /hesap\nDisallow: /yonetim\nDisallow: /ayarlar\nDisallow: /favoriler\n\nSitemap: ${base}/sitemap.xml\n`
+    ? `User-agent: *\nDisallow: /api/\nDisallow: /p/\nDisallow: /ilan/\nDisallow: /ilanlar\nDisallow: /panel\nDisallow: /giris\nDisallow: /hesap\nDisallow: /yonetim\nDisallow: /ayarlar\n\nSitemap: ${base}/sitemap.xml\n`
     : 'User-agent: *\nDisallow: /\n';
   return new Response(txt, { headers: { 'content-type': 'text/plain; charset=utf-8', 'cache-control': 'public, max-age=3600' } });
 }
