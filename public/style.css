@@ -275,3 +275,22 @@ body:has(.bar) footer{display:none}
 @keyframes camfl{0%{opacity:.8}100%{opacity:0}}
 
 @media(prefers-reduced-motion:reduce){*,*::before,*::after{animation:none!important;transition:none!important}.hxbg img.on{transform:none}}
+/* Video */
+.vsec{margin-top:26px;padding-top:20px;border-top:1px solid var(--ln)}.vsec h3{margin:0;font-size:22px}.vsec h3 small{display:block;font:500 12px Manrope,sans-serif;color:var(--mu);margin-top:4px}
+.vprev{margin-top:14px;border-radius:16px;overflow:hidden;background:#000;border:1px solid var(--ln)}.vprev video{display:block;width:100%;max-height:340px;background:#000}
+.vmeta{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;padding:8px 14px;background:var(--pn);font-size:13px;color:var(--mu)}
+.vbusy{margin-top:14px;padding:18px;border-radius:16px;background:var(--champ);border:1px solid var(--champ2)}.vbusy .pg{margin:0 0 10px}.vbusy b{color:var(--aud)}
+.shut.rec{background:#e5484d;box-shadow:inset 0 0 0 4px #000;transition:border-radius .2s}.shut.rec.on{background:#e5484d;box-shadow:inset 0 0 0 18px #000;animation:rpl 1.4s infinite}
+.vrt{font-variant-numeric:tabular-nums}
+@keyframes rpl{50%{border-color:#ffb4b4}}
+.ctv{position:absolute;right:12px;bottom:12px;font-size:12px;font-weight:700;padding:5px 11px;border-radius:99px;background:#2e2416cc;color:#fff;pointer-events:none}
+.gvid{position:absolute;right:12px;bottom:12px;border:0;background:#fffdf8f2;color:#5a4115;font-weight:700;font-size:13px;padding:7px 14px;border-radius:99px;box-shadow:0 4px 14px #0002}
+.dvid{display:block;width:100%;max-height:520px;border-radius:18px;background:#000}
+/* Başlık yardımı */
+.fh{display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:8px}.fh>span{font-size:13px;color:var(--mu);font-weight:600}
+.mic{display:inline-flex;align-items:center;gap:6px;padding:7px 13px;border-radius:99px;border:1px solid var(--champ2);background:var(--champ);color:var(--aud);font-size:13px;font-weight:600}.mic svg{width:17px;height:17px}
+.mic.on{background:#e5484d;border-color:#e5484d;color:#fff;animation:mpl 1.3s infinite}
+@keyframes mpl{0%{box-shadow:0 0 0 0 #e5484d66}70%{box-shadow:0 0 0 10px #e5484d00}100%{box-shadow:0 0 0 0 #e5484d00}}
+.tip0{margin-top:14px;padding:12px 14px;border-radius:14px;background:var(--champ);border:1px solid var(--champ2);font-size:14px;line-height:1.5}
+.sug{margin-top:10px}.sug>span{display:block;font-size:12px;color:var(--mu);margin-bottom:8px}.chip.sg{font-size:14px;padding:9px 14px;text-align:left}
+.dtas{display:block;margin:0 0 8px}

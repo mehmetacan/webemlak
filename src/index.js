@@ -4,6 +4,7 @@
 const PBKDF2_ITER = 100000; // Workers'ta izin verilen en yüksek değer
 const SESSION_DAYS = 30;
 const MAX_PHOTO_BYTES = 3 * 1024 * 1024;
+const MAX_VIDEO_BYTES = 90 * 1024 * 1024; // Cloudflare ücretsiz planda istek sınırı 100 MB
 const MAX_PHOTOS = 15;
 const LOGIN_MAX_TRIES = 5;
 const LOGIN_WINDOW_SEC = 15 * 60;
@@ -175,6 +176,10 @@ const TRMAP = { 'ç': 'c', 'ğ': 'g', 'ı': 'i', 'ö': 'o', 'ş': 's', 'ü': 'u'
 const slugify = (s) => String(s).toLocaleLowerCase('tr').replace(/[çğıöşüâîû]/g, (c) => TRMAP[c] || c)
   .normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 70) || 'ilan';
 const ilanPath = (id, baslik) => `/ilan/${ilanNo(id)}-${slugify(baslik)}`;
+const vidKey = (u) => {
+  const m = /^(?:\/img\/)?(v\/[A-Za-z0-9_-]{10,64}\.(?:mp4|webm))$/.exec(String(u || ''));
+  return m ? m[1] : null;
+};
 const keyFromUrl = (u) => {
   const m = /^(?:\/img\/)?(p\/[A-Za-z0-9_-]{10,64}\.jpg)$/.exec(String(u || ''));
   return m ? m[1] : null;
@@ -185,7 +190,7 @@ function toFront(r, withPrivate) {
     id: r.id, no: ilanNo(r.id), url: ilanPath(r.id, r.baslik), u: r.user_id, t: r.baslik, tip: r.tip, tur: r.tur, f: r.fiyat, m2: r.m2,
     il: r.il, ilce: r.ilce, mah: r.mah, oda: r.oda, kat: r.kat, yas: r.yas, as: r.asansor,
     oz: JSON.parse(r.ozellik || '[]'), d: r.aciklama,
-    p: JSON.parse(r.fotolar || '[]').map(imgUrl), on: r.yayinda,
+    p: JSON.parse(r.fotolar || '[]').map(imgUrl), v: r.video ? imgUrl(r.video) : '', on: r.yayinda,
     tarih: r.olusturma,
     sahip: { ad: r.sahip_ad, tel: r.sahip_tel, mail: r.sahip_mail },
   };
@@ -228,6 +233,7 @@ function parseListing(b) {
     ozellik: JSON.stringify(arsa ? [] : oz),
     aciklama: str(b.d, 3000, { name: 'Açıklama' }) || 'Detaylı bilgi için danışmanımızla iletişime geçin.',
     fotolar: JSON.stringify(p),
+    video: (() => { if (!b.v) return ''; const k = vidKey(b.v); if (!k) throw new HttpError(400, 'Video geçersiz.'); return k; })(),
   };
 }
 
@@ -389,11 +395,13 @@ async function api(req, env, url) {
       const v = parseListing(await body());
       await env.DB.prepare(
         `UPDATE listings SET baslik=?, tip=?, tur=?, fiyat=?, m2=?, il=?, ilce=?, mah=?, adres=?, lat=?, lon=?,
-         oda=?, kat=?, yas=?, asansor=?, ozellik=?, aciklama=?, fotolar=?, guncelleme=? WHERE id=?`
+         oda=?, kat=?, yas=?, asansor=?, ozellik=?, aciklama=?, fotolar=?, video=?, guncelleme=? WHERE id=?`
       ).bind(v.baslik, v.tip, v.tur, v.fiyat, v.m2, v.il, v.ilce, v.mah, v.adres, v.lat, v.lon,
-        v.oda, v.kat, v.yas, v.asansor, v.ozellik, v.aciklama, v.fotolar, now(), id).run();
+        v.oda, v.kat, v.yas, v.asansor, v.ozellik, v.aciklama, v.fotolar, v.video, now(), id).run();
       const eski = JSON.parse(row.fotolar || '[]'), yeni = JSON.parse(v.fotolar);
-      await deletePhotos(env, eski.filter((k) => !yeni.includes(k)));
+      const sil = eski.filter((k) => !yeni.includes(k));
+      if (row.video && row.video !== v.video) sil.push(row.video);
+      await deletePhotos(env, sil);
       return json(toFront(await getListingRow(env, id), true));
     }
     if (method === 'PATCH') {
@@ -404,7 +412,7 @@ async function api(req, env, url) {
     }
     if (method === 'DELETE') {
       await env.DB.prepare('DELETE FROM listings WHERE id = ?').bind(id).run();
-      await deletePhotos(env, JSON.parse(row.fotolar || '[]'));
+      await deletePhotos(env, [...JSON.parse(row.fotolar || '[]'), ...(row.video ? [row.video] : [])]);
       return json({ ok: true });
     }
   }
@@ -415,11 +423,31 @@ async function api(req, env, url) {
     const t = now();
     const r = await env.DB.prepare(
       `INSERT INTO listings (user_id, baslik, tip, tur, fiyat, m2, il, ilce, mah, adres, lat, lon, oda, kat, yas,
-       asansor, ozellik, aciklama, fotolar, yayinda, olusturma, guncelleme)
-       VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,1,?,?)`
+       asansor, ozellik, aciklama, fotolar, video, yayinda, olusturma, guncelleme)
+       VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,1,?,?)`
     ).bind(user.id, v.baslik, v.tip, v.tur, v.fiyat, v.m2, v.il, v.ilce, v.mah, v.adres, v.lat, v.lon,
-      v.oda, v.kat, v.yas, v.asansor, v.ozellik, v.aciklama, v.fotolar, t, t).run();
+      v.oda, v.kat, v.yas, v.asansor, v.ozellik, v.aciklama, v.fotolar, v.video, t, t).run();
     return json(toFront(await getListingRow(env, r.meta.last_row_id), true), 201);
+  }
+
+  // --- Video yükleme (tarayıcıda 720p'ye küçültülmüş olarak gelir) ---
+  if (path === '/videos' && method === 'POST') {
+    requireUser(user);
+    if (!env.FOTO) throw new HttpError(503, 'Dosya depolama henüz etkin değil.');
+    const type = (req.headers.get('content-type') || '').toLowerCase();
+    const ext = type.startsWith('video/mp4') ? 'mp4' : type.startsWith('video/webm') ? 'webm' : null;
+    if (!ext) throw new HttpError(415, 'Video MP4 veya WebM olmalı.');
+    const len = Number(req.headers.get('content-length') || 0);
+    if (!len || !req.body) throw new HttpError(400, 'Boş video.');
+    if (len > MAX_VIDEO_BYTES) throw new HttpError(413, 'Video çok büyük (en fazla 90 MB).');
+    const key = `v/${b64url(crypto.getRandomValues(new Uint8Array(18)))}.${ext}`;
+    await env.FOTO.put(key, req.body, { httpMetadata: { contentType: 'video/' + ext }, customMetadata: { user: String(user.id) } });
+    // Dosya imzasını doğrula (MP4: 'ftyp', WebM: EBML)
+    const head = await env.FOTO.get(key, { range: { offset: 0, length: 12 } });
+    const b = head ? new Uint8Array(await head.arrayBuffer()) : new Uint8Array();
+    const ok = ext === 'mp4' ? String.fromCharCode(...b.slice(4, 8)) === 'ftyp' : b[0] === 0x1a && b[1] === 0x45 && b[2] === 0xdf && b[3] === 0xa3;
+    if (!ok) { await env.FOTO.delete(key); throw new HttpError(415, 'Geçersiz video dosyası.'); }
+    return json({ url: imgUrl(key) }, 201);
   }
 
   // --- Fotoğraf yükleme ---
@@ -625,18 +653,29 @@ function robotsTxt(env, url) {
 
 // ---------- Fotoğraf sunumu ----------
 async function serveImage(req, env, url) {
-  const key = keyFromUrl(url.pathname);
+  const key = keyFromUrl(url.pathname) || vidKey(url.pathname);
   if (!key || !env.FOTO) return new Response('Bulunamadı', { status: 404 });
-  const obj = await env.FOTO.get(key);
+  const isVid = key.startsWith('v/');
+  const wantRange = isVid && req.headers.has('range');
+  const obj = await env.FOTO.get(key, wantRange ? { range: req.headers } : undefined);
   if (!obj) return new Response('Bulunamadı', { status: 404 });
-  return new Response(obj.body, {
-    headers: {
-      'content-type': 'image/jpeg',
-      'cache-control': 'public, max-age=31536000, immutable',
-      etag: obj.httpEtag,
-      'x-content-type-options': 'nosniff',
-    },
-  });
+  const headers = {
+    'content-type': isVid ? (key.endsWith('.mp4') ? 'video/mp4' : 'video/webm') : 'image/jpeg',
+    'cache-control': 'public, max-age=31536000, immutable',
+    etag: obj.httpEtag,
+    'accept-ranges': 'bytes',
+    'x-content-type-options': 'nosniff',
+  };
+  if (wantRange && obj.range) {
+    const r = obj.range, size = obj.size;
+    const start = 'suffix' in r && r.suffix != null ? size - r.suffix : r.offset ?? 0;
+    const end = 'suffix' in r && r.suffix != null ? size - 1 : r.length != null ? start + r.length - 1 : size - 1;
+    headers['content-range'] = `bytes ${start}-${end}/${size}`;
+    headers['content-length'] = String(end - start + 1);
+    return new Response(req.method === 'HEAD' ? null : obj.body, { status: 206, headers });
+  }
+  headers['content-length'] = String(obj.size);
+  return new Response(req.method === 'HEAD' ? null : obj.body, { headers });
 }
 
 export default {

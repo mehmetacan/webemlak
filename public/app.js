@@ -9,9 +9,11 @@ const SHR = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-w
 const CAM = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M4 8h3l2-3h6l2 3h3v11H4z"/><circle cx="12" cy="13" r="3.5"/></svg>';
 const GAL = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="3" y="4" width="18" height="16" rx="2"/><circle cx="9" cy="10" r="2"/><path d="M21 16l-5-5-9 9"/></svg>';
 
+const VID = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="3" y="6" width="13" height="12" rx="2"/><path d="M16 10.5l5-3v9l-5-3z"/></svg>';
+const MIC = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5.5 11a6.5 6.5 0 0 0 13 0M12 17.5V21"/></svg>';
 const TUR = ['Daire', 'Müstakil', 'Villa', 'Dubleks', 'Tarla', 'Parsel'];
 const OZ = ['Balkon', 'Otopark', 'Eşyalı', 'Güvenlik', 'Havuz'];
-const STEPS = ['Başlık', 'Fotoğraflar', 'Bilgiler', 'Açıklama'];
+const STEPS = ['Başlık', 'Fotoğraf ve video', 'Bilgiler', 'Başlık ve açıklama'];
 const ARSA = (t) => t === 'Tarla' || t === 'Parsel';
 
 // ---------- Durum ----------
@@ -92,7 +94,7 @@ function renderNav() {
 
 // ---------- Kartlar ----------
 function card(l) {
-  return `<div class="cdw"><a class="cd" href="${esc(l.url)}"><div class="cimg">${ph(l.p[0])}<span class="ctg">${esc(l.tip)}</span></div><div class="b"><div class="pc">${fiyat(l)}</div><div class="ct">${esc(l.t)}</div><div class="mu">${yer(l)}</div><div class="sp2"><span>${l.m2} m²</span>${ARSA(l.tur) ? `<span>${esc(l.tur)}</span>` : `<span>${esc(l.oda)}</span><span>${kt(l)}</span><span>${l.as ? 'Asansörlü' : 'Asansörsüz'}</span>`}</div></div></a>${favBtn(l)}</div>`;
+  return `<div class="cdw"><a class="cd" href="${esc(l.url)}"><div class="cimg">${ph(l.p[0])}<span class="ctg">${esc(l.tip)}</span>${l.v ? '<span class="ctv">▶ Video</span>' : ''}</div><div class="b"><div class="pc">${fiyat(l)}</div><div class="ct">${esc(l.t)}</div><div class="mu">${yer(l)}</div><div class="sp2"><span>${l.m2} m²</span>${ARSA(l.tur) ? `<span>${esc(l.tur)}</span>` : `<span>${esc(l.oda)}</span><span>${kt(l)}</span><span>${l.as ? 'Asansörlü' : 'Asansörsüz'}</span>`}</div></div></a>${favBtn(l)}</div>`;
 }
 
 const R = () => { F = { tip: '', q: '', pmin: '', pmax: '', amin: '', amax: '', oda: [], kat: '', as: '', s: F.s, tur: '', yas: '', oz: [], il: '' }; };
@@ -225,11 +227,12 @@ async function detail(no) {
   const contact = `<div class="pn"><div class="agent"><div class="av">${esc(initials(u.ad))}</div><div><b>${esc(u.ad)}</b><div class="mu">Asya Emlak danışmanı</div></div></div>${u.tel ? `<a href="tel:${esc(u.tel)}"><button class="pr cbtn">${PHONE} ${esc(u.tel)}</button></a>` : ''}${wa ? `<a href="https://wa.me/90${esc(wa)}?text=${encodeURIComponent(msg)}" target="_blank" rel="noopener"><button class="cbtn wa">${WAI} WhatsApp ile yaz</button></a>` : ''}<a href="mailto:${esc(u.mail)}?subject=${encodeURIComponent('İlan ' + l.no + ': ' + l.t)}&body=${encodeURIComponent(msg)}"><button class="cbtn">${MAIL} E-posta gönder</button></a><p class="mu" style="margin:12px 0 0;text-align:center">Ararken <b>İlan No ${l.no}</b> belirtin.</p></div>`;
   $('#app').innerHTML = `<div class="w dtw"><div class="bc" role="navigation" aria-label="Konum"><a href="/ilanlar">İlanlar</a><span>›</span><a href="/ilanlar" data-il="${esc(l.il)}">${esc(l.il)}</a><span>›</span><span>${esc(l.ilce)}</span></div>
   <div class="dt"><div class="dmain">
-   <div class="gal"><div class="gtrack" id="gtr">${l.p.map((x, i) => `<button type="button" class="gsl" data-lb="${i}" aria-label="Fotoğraf ${i + 1} / ${n}, büyüt">${img(x, i, i > 0)}</button>`).join('')}</div>${n > 1 ? `<button type="button" class="gnav gp" data-gd="-1" aria-label="Önceki fotoğraf">‹</button><button type="button" class="gnav gn" data-gd="1" aria-label="Sonraki fotoğraf">›</button>` : ''}<span class="gct" id="gct">1 / ${n}</span>${favBtn(l)}</div>
+   <div class="gal"><div class="gtrack" id="gtr">${l.p.map((x, i) => `<button type="button" class="gsl" data-lb="${i}" aria-label="Fotoğraf ${i + 1} / ${n}, büyüt">${img(x, i, i > 0)}</button>`).join('')}</div>${n > 1 ? `<button type="button" class="gnav gp" data-gd="-1" aria-label="Önceki fotoğraf">‹</button><button type="button" class="gnav gn" data-gd="1" aria-label="Sonraki fotoğraf">›</button>` : ''}<span class="gct" id="gct">1 / ${n}</span>${l.v ? '<button type="button" class="gvid" id="gvid">▶ Video</button>' : ''}${favBtn(l)}</div>
    ${n > 1 ? `<div class="gth" id="gth">${l.p.map((x, i) => `<button type="button" data-gi="${i}" class="${i ? '' : 'a'}" aria-label="Fotoğraf ${i + 1}">${img(x, i, true)}</button>`).join('')}</div>` : ''}
    <div class="dh"><div><div class="sp2" style="margin:0"><span class="tg">${esc(l.tip)}</span><span class="tg">${esc(l.tur)}</span>${l.on ? '' : '<span class="tg" style="border-color:#ff8b8b;color:#ff8b8b">Yayında değil</span>'}</div><h1 class="dtt">${esc(l.t)}</h1><p class="loc">${PIN}${yer(l)}</p></div><div class="dpr"><div class="pc">${fiyat(l)}</div>${m2f}</div></div>
    <div class="dact">${favBtn(l, true)}<button type="button" id="shr">${SHR}<span>Paylaş</span></button><span class="ino">İlan No <b>${l.no}</b> · ${esc(tarih(l.tarih))}</span></div>
    <div class="facts">${facts.map(([k, v]) => `<div><span>${k}</span><b>${esc(v)}</b></div>`).join('')}</div>
+   ${l.v ? `<section class="dsec" id="vsec"><h2>Video</h2><video class="dvid" src="${esc(l.v)}" controls playsinline preload="metadata"${typeof l.p[0] === 'string' ? ` poster="${esc(l.p[0])}"` : ''}></video></section>` : ''}
    ${(l.oz || []).length ? `<section class="dsec"><h2>Özellikler</h2><div class="sp2">${l.oz.map((o) => `<span class="tg">✓ ${esc(o)}</span>`).join('')}</div></section>` : ''}
    <section class="dsec"><h2>Açıklama</h2><p class="desc ${String(l.d).length > 600 ? 'clip' : ''}" id="dsc">${esc(l.d)}</p>${String(l.d).length > 600 ? '<button type="button" id="dmore" class="lnk">Devamını oku</button>' : ''}</section>
   </div>
@@ -239,6 +242,7 @@ async function detail(no) {
   <div class="cbar">${u.tel ? `<a href="tel:${esc(u.tel)}"><button class="pr">${PHONE} Ara</button></a>` : ''}${wa ? `<a href="https://wa.me/90${esc(wa)}?text=${encodeURIComponent(msg)}" target="_blank" rel="noopener"><button class="wa">${WAI} WhatsApp</button></a>` : ''}</div>
   <div class="lb" id="lb" role="dialog" aria-modal="true" aria-label="Fotoğraflar" hidden><div class="lbtop"><span id="lbc"></span><button type="button" class="lbx" id="lbx" aria-label="Kapat">✕</button></div><div class="lbtr" id="lbtr">${l.p.map((x, i) => `<figure>${img(x, i, true)}</figure>`).join('')}</div>${n > 1 ? `<button type="button" class="gnav gp" data-ld="-1" aria-label="Önceki">‹</button><button type="button" class="gnav gn" data-ld="1" aria-label="Sonraki">›</button>` : ''}</div>`;
 
+  if ($('#gvid')) $('#gvid').onclick = () => { const v = $('#vsec'); v.scrollIntoView({ behavior: 'smooth', block: 'center' }); setTimeout(() => { try { v.querySelector('video').play(); } catch {} }, 500); };
   // Galeri
   const tr = $('#gtr'), ct = $('#gct');
   const gi = () => Math.round(tr.scrollLeft / Math.max(1, tr.clientWidth));
@@ -316,9 +320,10 @@ function hesap() {
 
 // ---------- İlanlarım ----------
 const gd = () => { try { return JSON.parse(localStorage.getItem('asya-draft') || 'null'); } catch { return null; } };
-const draft = () => { try { localStorage.setItem('asya-draft', JSON.stringify({ W, ws })); } catch {} };
+const wrep = (k, v) => (k.startsWith('_v') ? undefined : v);
+const draft = () => { try { localStorage.setItem('asya-draft', JSON.stringify({ W, ws }, wrep)); } catch {} };
 const nod = () => { try { localStorage.removeItem('asya-draft'); } catch {} };
-const blank = () => ({ t: '', tip: 'Satılık', tur: 'Daire', p: [], f: '', m2: '', il: '', ilce: '', mah: '', adr: '', lat: null, lon: null, oda: '2+1', kat: 1, yas: 0, as: 1, oz: [], d: '' });
+const blank = () => ({ t: '', tip: 'Satılık', tur: 'Daire', p: [], f: '', m2: '', il: '', ilce: '', mah: '', adr: '', lat: null, lon: null, oda: '2+1', kat: 1, yas: 0, as: 1, oz: [], d: '', v: '' });
 let PT = 'mine', PQ = { q: '', sahip: '', durum: '' };
 
 async function panel() {
@@ -430,13 +435,220 @@ async function camOpen() {
   };
 }
 
+// ---------- Video (ücretsiz: tarayıcıda 720p'ye küçültülür) ----------
+const VMAX = 180, VBPS = 1800000, VRAW = 25 * 1024 * 1024, VLIM = 90 * 1024 * 1024;
+const vMime = () => {
+  const M = window.MediaRecorder; if (!M || !M.isTypeSupported) return '';
+  return ['video/mp4;codecs=avc1.42E01F,mp4a.40.2', 'video/mp4;codecs=avc1', 'video/mp4', 'video/webm;codecs=vp9,opus', 'video/webm;codecs=vp8,opus', 'video/webm'].find((t) => { try { return M.isTypeSupported(t); } catch { return false; } }) || '';
+};
+const vBase = (t) => (String(t).startsWith('video/mp4') ? 'video/mp4' : String(t).startsWith('video/webm') ? 'video/webm' : '');
+const mmss = (x) => `${Math.floor(x / 60)}:${String(Math.floor(x % 60)).padStart(2, '0')}`;
+const MB = (b) => (b / 1048576).toFixed(b < 10485760 ? 1 : 0).replace('.', ',') + ' MB';
+function setVid(blob) { if (W._vu) URL.revokeObjectURL(W._vu); W._vb = blob || null; W._vu = blob ? URL.createObjectURL(blob) : ''; }
+const vRecorder = (st, mt) => { try { return new MediaRecorder(st, { mimeType: mt, videoBitsPerSecond: VBPS, audioBitsPerSecond: 96000 }); } catch { return new MediaRecorder(st); } };
+
+// Uygulama içi video çekimi (720p, en fazla 3 dk)
+async function vidRec() {
+  const mt = vMime(), fallback = () => $('#w-vf') && $('#w-vf').click();
+  if (!mt || !navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) return fallback();
+  const vc = { facingMode: { ideal: 'environment' }, width: { ideal: 1280 }, height: { ideal: 720 }, frameRate: { ideal: 30, max: 30 } };
+  let st;
+  try { st = await navigator.mediaDevices.getUserMedia({ video: vc, audio: { echoCancellation: true, noiseSuppression: true } }); }
+  catch (e) {
+    try { st = await navigator.mediaDevices.getUserMedia({ video: vc, audio: false }); toast('Mikrofon izni yok; video sessiz çekilecek.'); }
+    catch (e2) { if (e2 && e2.name === 'NotAllowedError') toast('Kamera izni verilmedi. Telefonun kendi kamerası açılıyor.'); return fallback(); }
+  }
+  const ov = document.createElement('div');
+  ov.className = 'cam'; ov.setAttribute('role', 'dialog'); ov.setAttribute('aria-modal', 'true'); ov.setAttribute('aria-label', 'Video çek');
+  ov.innerHTML = `<video playsinline autoplay muted></video><div class="camtop"><span id="vrt" class="vrt">0:00 / ${mmss(VMAX)}</span><button type="button" class="lbx" id="vrx" aria-label="Kapat">✕</button></div><div class="cambar"><span class="mu" id="vrh" style="color:#fff;font-size:13px">Telefonu yatay tutmanız önerilir</span><button type="button" class="shut rec" id="vrb" aria-label="Kaydı başlat"></button><span></span></div>`;
+  document.body.append(ov); document.body.style.overflow = 'hidden';
+  ov.querySelector('video').srcObject = st;
+  let rec = null, chunks = [], t0 = 0, iv = 0, keep = false;
+  const btn = ov.querySelector('#vrb'), tm = ov.querySelector('#vrt');
+  const end = () => { clearInterval(iv); st.getTracks().forEach((t) => t.stop()); ov.remove(); document.body.style.overflow = ''; LB = null; wiz(); };
+  const close = () => { if (rec && rec.state !== 'inactive') { rec.stop(); } else end(); };
+  try { history.pushState({ cam: 1 }, '', location.href); } catch {}
+  LB = close;
+  ov.querySelector('#vrx').onclick = () => history.back();
+  btn.onclick = () => {
+    if (!rec) {
+      rec = vRecorder(st, mt); chunks = [];
+      rec.ondataavailable = (e) => { if (e.data && e.data.size) chunks.push(e.data); };
+      rec.onstop = () => {
+        if (keep && chunks.length) { const b = new Blob(chunks, { type: vBase(rec.mimeType || mt) || 'video/webm' }); setVid(b); W._vd = Math.round((Date.now() - t0) / 1000); toast(`Video eklendi (${MB(b.size)})`); }
+        end();
+      };
+      rec.start(1000); t0 = Date.now(); btn.classList.add('on'); btn.setAttribute('aria-label', 'Kaydı bitir'); ov.querySelector('#vrh').textContent = 'Kaydediliyor… bitirmek için dokunun';
+      iv = setInterval(() => { const sec = (Date.now() - t0) / 1000; tm.textContent = `● ${mmss(sec)} / ${mmss(VMAX)}`; if (sec >= VMAX) { keep = true; history.back(); } }, 250);
+      if (navigator.vibrate) navigator.vibrate(30);
+    } else { keep = true; history.back(); }
+  };
+}
+
+// Galeriden seçilen videoyu 720p'ye küçültür (gerçek zamanlı yeniden kayıt)
+async function compressVideo(file, onp) {
+  const ok = vBase(file.type), mt = vMime();
+  const url = URL.createObjectURL(file);
+  const v = document.createElement('video');
+  v.src = url; v.playsInline = true; v.preload = 'auto'; v.setAttribute('playsinline', '');
+  v.style.cssText = 'position:fixed;left:-9999px;width:2px;height:2px';
+  document.body.append(v);
+  const clean = () => { v.pause(); v.removeAttribute('src'); v.load(); v.remove(); URL.revokeObjectURL(url); };
+  try {
+    await new Promise((res, rej) => { v.onloadedmetadata = res; v.onerror = () => rej(new Error('Video okunamadı (desteklenmeyen biçim).')); setTimeout(() => rej(new Error('Video okunamadı.')), 20000); });
+    const dur = v.duration;
+    if (isFinite(dur) && dur > VMAX + 1) throw new Error(`Video ${mmss(dur)} dakika. En fazla 3 dakikalık video ekleyebilirsiniz; telefonunuzda kırpıp tekrar deneyin.`);
+    const small = Math.max(v.videoWidth, v.videoHeight) <= 1280;
+    if (ok && (file.size <= VRAW || (small && file.size <= VLIM))) { clean(); return { blob: file, dur }; }
+    if (!mt || !HTMLCanvasElement.prototype.captureStream) {
+      if (ok && file.size <= VLIM) { clean(); return { blob: file, dur }; }
+      throw new Error('Bu tarayıcı videoyu küçültemiyor. "Video çek" ile doğrudan çekin.');
+    }
+    const k = Math.min(1, 1280 / Math.max(v.videoWidth, v.videoHeight));
+    const c = document.createElement('canvas');
+    c.width = Math.round(v.videoWidth * k / 2) * 2; c.height = Math.round(v.videoHeight * k / 2) * 2;
+    const g = c.getContext('2d');
+    const st = c.captureStream(30);
+    let ac = null;
+    try {
+      const AC = window.AudioContext || window.webkitAudioContext;
+      ac = new AC(); const src = ac.createMediaElementSource(v), dst = ac.createMediaStreamDestination();
+      src.connect(dst); dst.stream.getAudioTracks().forEach((t) => st.addTrack(t)); await ac.resume();
+    } catch { ac = null; v.muted = true; }
+    const rec = vRecorder(st, mt), chunks = [];
+    rec.ondataavailable = (e) => { if (e.data && e.data.size) chunks.push(e.data); };
+    const done = new Promise((res) => { rec.onstop = res; });
+    let live = true;
+    const draw = () => { if (!live) return; g.drawImage(v, 0, 0, c.width, c.height); if (onp && isFinite(dur) && dur) onp(Math.min(1, v.currentTime / dur)); if (v.requestVideoFrameCallback) v.requestVideoFrameCallback(draw); else requestAnimationFrame(draw); };
+    try { await v.play(); } catch { v.muted = true; await v.play(); }
+    rec.start(1000); draw();
+    await new Promise((res) => { v.onended = res; v.onerror = res; });
+    live = false; rec.stop(); await done;
+    st.getTracks().forEach((t) => t.stop()); if (ac) ac.close();
+    const out = new Blob(chunks, { type: vBase(rec.mimeType || mt) || 'video/webm' });
+    clean();
+    if (!out.size) throw new Error('Video küçültülemedi.');
+    if (ok && file.size <= out.size && file.size <= VLIM) return { blob: file, dur };
+    if (out.size > VLIM) throw new Error('Video çok büyük. Daha kısa bir video seçin.');
+    return { blob: out, dur };
+  } catch (e) { clean(); throw e; }
+}
+
+function upVid(blob, onp) {
+  return new Promise((res, rej) => {
+    const x = new XMLHttpRequest();
+    x.open('POST', '/api/videos'); x.withCredentials = true;
+    x.setRequestHeader('x-asya', '1'); x.setRequestHeader('content-type', vBase(blob.type) || 'video/mp4');
+    x.upload.onprogress = (e) => { if (e.lengthComputable && onp) onp(e.loaded / e.total); };
+    x.onload = () => { let j = {}; try { j = JSON.parse(x.responseText); } catch {} if (x.status >= 200 && x.status < 300 && j.url) res(j.url); else { const e = new Error(j.hata || 'Video yüklenemedi.'); e.status = x.status; rej(e); } };
+    x.onerror = () => rej(new Error('Video yüklenemedi. İnternet bağlantınızı kontrol edin.'));
+    x.send(blob);
+  });
+}
+
+// ---------- Başlık yardımı: sesle yazma + öneriler ----------
+const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+let REC = null;
+const micBtn = (id) => (SR ? `<button type="button" class="mic" data-mic="${id}" aria-label="Sesle yaz">${MIC}<span>Sesle yaz</span></button>` : '');
+const bas1 = (x) => (x ? x.charAt(0).toLocaleUpperCase('tr-TR') + x.slice(1) : x);
+function micStop() { if (!REC) return; const r = REC; REC = null; r.onend = r.onresult = r.onerror = null; try { r.abort(); } catch {} }
+function micBind(A) {
+  A.querySelectorAll('[data-mic]').forEach((b) => (b.onclick = () => {
+    if (REC) { const was = REC._b === b; REC.stop(); if (was) return; }
+    const el = document.getElementById(b.dataset.mic), ta = el.tagName === 'TEXTAREA';
+    const r = new SR(); r.lang = 'tr-TR'; r.interimResults = true; r.continuous = ta; r.maxAlternatives = 1; r._b = b;
+    const base = el.value.trim() ? el.value.replace(/\s*$/, ta ? '\n' : ' ') : '';
+    let fin = '';
+    r.onresult = (e) => {
+      let im = '';
+      for (let i = e.resultIndex; i < e.results.length; i++) { const t = e.results[i][0].transcript; if (e.results[i].isFinal) fin += t.trim() + ' '; else im += t; }
+      let v = base + bas1((fin + im).replace(/\s+/g, ' ').trimStart());
+      if (!ta) v = v.trim();
+      el.value = v.slice(0, el.maxLength > 0 ? el.maxLength : 3000); el.dispatchEvent(new Event('input'));
+    };
+    r.onerror = (e) => { if (e.error === 'not-allowed' || e.error === 'service-not-allowed') toast('Mikrofon izni verilmedi. Tarayıcı ayarlarından mikrofona izin verin.'); else if (e.error === 'no-speech') toast('Ses algılanamadı, tekrar deneyin.'); else if (e.error === 'network') toast('Sesle yazma için internet gerekli.'); };
+    r.onend = () => { if (REC === r) REC = null; b.classList.remove('on'); b.querySelector('span').textContent = 'Sesle yaz'; if (!ta && el.value) el.value = el.value.replace(/[.\s]+$/, ''); wsync(); draft(); };
+    try { r.start(); REC = r; b.classList.add('on'); b.querySelector('span').textContent = 'Dinliyorum… bitirmek için dokunun'; el.focus({ preventScroll: true }); }
+    catch { toast('Sesle yazma başlatılamadı.'); }
+  }));
+}
+const mahK = (m) => { const x = String(m || '').replace(/\s+(Mahallesi|Mahalle|Mah\.?|Mh\.?)$/i, '').trim(); return x ? x + ' Mah.' : ''; };
+const turAd = (t) => (t === 'Müstakil' ? 'Müstakil Ev' : t);
+const nf = (n) => Number(n).toLocaleString('tr-TR');
+function oneriler() {
+  const out = [], add = (x) => { x = x.replace(/\s+/g, ' ').trim(); if (x.length >= 5 && x.length <= 80 && !out.includes(x)) out.push(x); };
+  const tip = W.tip, tur = turAd(W.tur), yer1 = W.mah ? mahK(W.mah) : W.ilce || W.il, yer2 = [W.ilce, mahK(W.mah)].filter(Boolean).join(' ');
+  const m2 = W.m2 ? nf(W.m2) + ' m²' : '';
+  if (ARSA(W.tur)) {
+    add(`${yer2 || yer1} ${m2} ${tip} ${tur}`);
+    if (tip === 'Satılık') add(`Yatırımlık ${m2} ${tip} ${tur}`);
+    add(`${W.il || ''} ${W.ilce || ''} ${tip} ${m2} ${tur}`);
+    if (W.mah) add(`${mahK(W.mah)} ${tip} ${tur}`);
+  } else {
+    const ad = { Havuz: 'Havuzlu', Güvenlik: 'Güvenlikli', Eşyalı: 'Eşyalı', Otopark: 'Otoparklı', Balkon: 'Balkonlu' };
+    const f = ['Havuz', 'Güvenlik', 'Eşyalı', 'Otopark', 'Balkon'].filter((o) => (W.oz || []).includes(o)).map((o) => ad[o]);
+    if (W.as && !['Villa', 'Müstakil'].includes(W.tur)) f.push('Asansörlü');
+    const yeni = +W.yas === 0 ? 'Sıfır ' : '';
+    add(`${yer1} ${W.oda} ${tip} ${tur}`);
+    if (f.length) add(`${f.slice(0, 2).join(' ')} ${W.oda} ${tip} ${tur}`);
+    add(`${yer2} ${yeni}${m2} ${W.oda} ${tip} ${tur}`);
+    if (yeni || f.length) add(`${yer1} ${yeni}${f[0] || ''} ${W.oda} ${tur}`);
+    add(`${W.ilce || W.il} ${W.oda} ${tip} ${tur}`);
+  }
+  return out.slice(0, 4);
+}
+function taslak() {
+  const ar = ARSA(W.tur), lo = (x) => String(x).toLocaleLowerCase('tr-TR');
+  const yr = [mahK(W.mah), W.ilce, W.il].filter(Boolean).join(', ');
+  const ln = [`${yr ? yr + ' konumunda ' : ''}${lo(W.tip)} ${ar ? '' : W.oda + ' '}${lo(turAd(W.tur))}.`, ''];
+  if (W.m2) ln.push(`• ${ar ? 'Arsa alanı' : 'Brüt alan'}: ${nf(W.m2)} m²`);
+  if (!ar) {
+    ln.push(`• Oda sayısı: ${W.oda}`);
+    if (!['Villa', 'Müstakil'].includes(W.tur)) ln.push(`• Bulunduğu kat: ${kv('kat', W.kat)}`);
+    ln.push(`• Bina yaşı: ${+W.yas ? W.yas + ' yıl' : 'Yeni bina'}`);
+    ln.push(`• Asansör: ${W.as ? 'Var' : 'Yok'}`);
+    if ((W.oz || []).length) ln.push(`• Özellikler: ${W.oz.join(', ')}`);
+  }
+  if (W.f) ln.push(`• Fiyat: ${TL(W.f)}${W.tip === 'Kiralık' ? ' / ay' : ''}`);
+  ln.push('', 'Detaylı bilgi almak ve yerinde görmek için bizi arayabilirsiniz.');
+  return bas1(ln.join('\n'));
+}
+
+function vidSec() {
+  const has = W._vb || W.v;
+  let in_ = '';
+  if (W._vbusy) in_ = `<div class="vbusy"><div class="pg"><i id="w-vp" style="width:0"></i></div><b id="w-vt">Video hazırlanıyor…</b><p class="mu" style="margin:6px 0 0;font-size:13px">Video küçültülüyor; video süresi kadar sürer. Bu sırada ekranı açık tutun ve sayfadan çıkmayın.</p></div>`;
+  else if (has) in_ = `<div class="vprev"><video src="${esc(W._vu || W.v)}" controls playsinline preload="metadata"></video><div class="vmeta"><span>${W._vb ? `Hazır · ${MB(W._vb.size)}${W._vd ? ' · ' + mmss(W._vd) : ''} · yayınlarken yüklenecek` : 'Yüklü video'}</span><button type="button" class="lnk" id="w-vx">Videoyu kaldır</button></div></div>`;
+  else in_ = `<div class="pb"><button type="button" class="pbb" id="w-vr">${VID}Video çek<small>720p · en fazla 3 dk</small></button><label>${GAL}Galeriden video<small>Otomatik küçültülür</small><input type="file" accept="video/*" id="w-vg"></label></div>`;
+  return `<div class="vsec"><h3>Video <small>isteğe bağlı · 1 video · en fazla 3 dakika</small></h3>${in_}<input type="file" accept="video/*" capture="environment" id="w-vf" hidden></div>`;
+}
+function vidBind(A, er) {
+  const pick = async (inp) => {
+    const f = inp.files && inp.files[0]; inp.value = ''; if (!f) return;
+    if (!f.type.startsWith('video/') && !/\.(mp4|mov|webm|m4v|3gp)$/i.test(f.name)) return er('Lütfen bir video dosyası seçin.');
+    wsync(); W._vbusy = 1; wiz();
+    try {
+      const r = await compressVideo(f, (p) => { const b = $('#w-vp'), t = $('#w-vt'); if (b) b.style.width = Math.round(p * 100) + '%'; if (t) t.textContent = `Video küçültülüyor %${Math.round(p * 100)}`; });
+      if (!W) return;
+      setVid(r.blob); W._vd = isFinite(r.dur) ? Math.round(r.dur) : 0;
+      W._vbusy = 0; if (ws === 1) wiz();
+      toast(`Video eklendi (${MB(f.size)} → ${MB(r.blob.size)})`);
+    } catch (e) { if (!W) return; W._vbusy = 0; if (ws === 1) { wiz(); $('#w-e').textContent = e.message; } else toast(e.message); }
+  };
+  if ($('#w-vg')) $('#w-vg').onchange = (e) => pick(e.target);
+  if ($('#w-vf')) $('#w-vf').onchange = (e) => pick(e.target);
+  if ($('#w-vr')) $('#w-vr').onclick = () => { wsync(); vidRec(); };
+  if ($('#w-vx')) $('#w-vx').onclick = () => { if (!confirm('Video kaldırılsın mı?')) return; wsync(); setVid(null); W.v = ''; W._vd = 0; draft(); wiz(); };
+}
+
 function wiz() {
+  micStop();
   const s = ws, ar = ARSA(W.tur);
   let body = '';
-  if (s === 0) body = `<h2>İlan başlığı</h2><p class="mu" style="margin:0">Kısa ve dikkat çekici olsun. Örnek: Deniz manzaralı 3+1 daire</p><div class="fld"><input id="w-t" maxlength="80" placeholder="İlan başlığı" value="${esc(W.t)}" enterkeyhint="next"><div class="mu" style="text-align:right;font-size:12px;margin-top:4px"><span id="w-c">${W.t.length}</span>/80</div></div><div class="fld"><span>İlan tipi</span>${ch('tip', ['Satılık', 'Kiralık'])}</div>`;
-  if (s === 1) body = `<h2>Fotoğraflar</h2><p class="mu" style="margin:0">En fazla 15 fotoğraf. İlk fotoğraf vitrin görseli olur.</p>${fotoOk ? '' : '<p class="err">Fotoğraf depolama henüz etkin değil; ilan şu an kaydedilemez.</p>'}<div class="pb"><button type="button" class="pbb" id="w-camb">${CAM}Kamerayla çek<small>Art arda çekin</small></button><label>${GAL}Galeriden seç<small>Birden fazla seçin</small><input type="file" accept="image/*" multiple id="w-gal"></label><input type="file" accept="image/*" capture="environment" multiple id="w-cam" hidden></div><div id="w-st" class="mu" style="margin-top:12px">${W.p.length} / 15 fotoğraf</div><p class="mu" style="font-size:12px;margin:4px 0 0">İpucu: Galeride birden fazla fotoğrafa dokunarak hepsini tek seferde ekleyebilirsiniz. Seçim açılmazsa ilk fotoğrafa basılı tutun.</p><div class="tgrid">${W.p.map((x, i) => `<div class="t" style="background-image:url('${esc(x)}')">${i === 0 ? '<b>Vitrin</b>' : ''}<button type="button" class="x" data-rm="${i}" aria-label="Fotoğrafı kaldır">✕</button>${i ? `<button type="button" class="cv" data-cv="${i}">Vitrin yap</button>` : ''}</div>`).join('')}</div>`;
+  if (s === 0) body = `<h2>İlan başlığı</h2><p class="mu" style="margin:0">Kısa ve dikkat çekici olsun. Örnek: Deniz manzaralı 3+1 daire</p><div class="tip0">💡 Şimdi yazmak zorunda değilsiniz. Boş bırakırsanız son adımda, girdiğiniz bilgilere göre hazır başlık önerileri çıkar; birine dokunmanız yeterli.</div><div class="fld"><div class="fh"><span>Başlık (isteğe bağlı)</span>${micBtn('w-t')}</div><input id="w-t" maxlength="80" placeholder="İlan başlığı" value="${esc(W.t)}" enterkeyhint="next"><div class="mu" style="text-align:right;font-size:12px;margin-top:4px"><span id="w-c">${W.t.length}</span>/80</div></div><div class="fld"><span>İlan tipi</span>${ch('tip', ['Satılık', 'Kiralık'])}</div>`;
+  if (s === 1) body = `<h2>Fotoğraflar</h2><p class="mu" style="margin:0">En fazla 15 fotoğraf. İlk fotoğraf vitrin görseli olur.</p>${fotoOk ? '' : '<p class="err">Fotoğraf depolama henüz etkin değil; ilan şu an kaydedilemez.</p>'}<div class="pb"><button type="button" class="pbb" id="w-camb">${CAM}Kamerayla çek<small>Art arda çekin</small></button><label>${GAL}Galeriden seç<small>Birden fazla seçin</small><input type="file" accept="image/*" multiple id="w-gal"></label><input type="file" accept="image/*" capture="environment" multiple id="w-cam" hidden></div><div id="w-st" class="mu" style="margin-top:12px">${W.p.length} / 15 fotoğraf</div><p class="mu" style="font-size:12px;margin:4px 0 0">İpucu: Galeride birden fazla fotoğrafa dokunarak hepsini tek seferde ekleyebilirsiniz. Seçim açılmazsa ilk fotoğrafa basılı tutun.</p><div class="tgrid">${W.p.map((x, i) => `<div class="t" style="background-image:url('${esc(x)}')">${i === 0 ? '<b>Vitrin</b>' : ''}<button type="button" class="x" data-rm="${i}" aria-label="Fotoğrafı kaldır">✕</button>${i ? `<button type="button" class="cv" data-cv="${i}">Vitrin yap</button>` : ''}</div>`).join('')}</div>${vidSec()}`;
   if (s === 2) body = `<h2>İlan bilgileri</h2><div class="fld"><span>Emlak türü</span>${ch('tur', TUR)}</div><div class="fld"><span>Fiyat (₺)${W.tip === 'Kiralık' ? ' / aylık' : ''}</span><input id="w-f" inputmode="numeric" placeholder="Örn. 2.500.000" value="${W.f ? Number(W.f).toLocaleString('tr-TR') : ''}"></div><div class="fld"><span>${ar ? 'Arsa alanı' : 'Brüt alan'} (m²)</span><input id="w-m2" inputmode="numeric" placeholder="Örn. 120" value="${W.m2}"></div><div class="fld"><span>Konum</span><button type="button" class="pr gps" id="w-gps">${PIN}Mevcut konumumu kullan</button><div class="mu" id="w-gs" style="margin:8px 0">${W.lat ? 'Konum alındı. Gerekirse aşağıdan düzeltebilirsiniz.' : 'Mülkün yanındaysanız tek dokunuşla adres doldurulur.'}</div><div class="rg"><input id="w-il" placeholder="İl" list="w-ils" value="${esc(W.il)}"><input id="w-ilce" placeholder="İlçe" value="${esc(W.ilce)}"></div><input id="w-mah" placeholder="Mahalle" value="${esc(W.mah)}" style="margin-top:8px"><div class="prv"><span>Açık adres</span><b>Sadece siz görürsünüz</b></div><textarea id="w-adr" rows="2" placeholder="Sokak, bina no, daire (ziyaretçilere gösterilmez)">${esc(W.adr)}</textarea>${W.lat ? `<iframe class="wmap" title="Seçilen konum" loading="lazy" src="${mapEmbed(W.lat, W.lon)}"></iframe>` : ''}<datalist id="w-ils">${[...new Set(['Antalya', 'İstanbul', 'Ankara', 'İzmir', 'Bursa', 'Muğla', 'Mersin', 'Aydın', ...L.map((l) => l.il)])].map((x) => `<option value="${esc(x)}">`).join('')}</datalist></div>` + (ar ? '' : `<div class="fld"><span>Oda sayısı</span>${ch('oda', ['1+0', '1+1', '2+1', '3+1', '4+1', '5+1'])}</div><div class="fld"><span>Bulunduğu kat</span>${stp('kat', -2, 60)}</div><div class="fld"><span>Bina yaşı</span>${stp('yas', 0, 100)}</div><div class="fld"><span>Asansör</span><div class="chips"><button type="button" class="chip ${W.as ? 'on' : ''}" data-as="1">Var</button><button type="button" class="chip ${W.as ? '' : 'on'}" data-as="0">Yok</button></div></div><div class="fld"><span>Özellikler</span><div class="chips">${OZ.map((o) => `<button type="button" class="chip ${W.oz.includes(o) ? 'on' : ''}" data-oz="${o}">${o}</button>`).join('')}</div></div>`);
-  if (s === 3) body = `<h2>Açıklama</h2><p class="mu" style="margin:0">Evin öne çıkan yönlerini, çevresini ve ulaşımı anlatın.</p><div class="fld"><textarea id="w-d" rows="8" maxlength="3000" placeholder="Örn. Güney cephe, yeni tadilatlı, okula 5 dakika yürüme mesafesinde...">${esc(W.d)}</textarea></div><div class="pn" style="margin-top:18px"><h3 style="margin:0 0 12px">Özet</h3><dl class="sum"><dt>Başlık</dt><dd>${esc(W.t)}</dd><dt>Tip</dt><dd>${esc(W.tip)} · ${esc(W.tur)}</dd><dt>Fiyat</dt><dd>${W.f ? TL(W.f) : '-'}</dd><dt>Alan</dt><dd>${W.m2 || '-'} m²</dd><dt>Konum</dt><dd>${yer(W)}</dd>${W.adr ? `<dt>Açık adres</dt><dd>${esc(W.adr)} <span class="mu">(sadece siz)</span></dd>` : ''}${ar ? '' : `<dt>Oda</dt><dd>${esc(W.oda)}</dd><dt>Kat</dt><dd>${kv('kat', W.kat)}</dd>`}<dt>Fotoğraf</dt><dd>${W.p.length} adet</dd></dl></div>`;
+  if (s === 3) body = `<h2>Başlık ve açıklama</h2><div class="fld"><div class="fh"><span>İlan başlığı</span>${micBtn('w-t')}</div><input id="w-t" maxlength="80" placeholder="Yazın, söyleyin ya da aşağıdan seçin" value="${esc(W.t)}"><div class="mu" style="text-align:right;font-size:12px;margin-top:4px"><span id="w-c">${W.t.length}</span>/80</div>${(() => { const o = oneriler(); return o.length ? `<div class="sug"><span>Öneriler · dokunup seçin, sonra dilediğiniz gibi düzenleyin</span><div class="chips">${o.map((x) => `<button type="button" class="chip sg ${x === W.t ? 'on' : ''}" data-sg="${esc(x)}">${esc(x)}</button>`).join('')}</div></div>` : ''; })()}</div><div class="fld"><div class="fh"><span>Açıklama</span>${micBtn('w-d')}</div><p class="mu" style="margin:0 0 8px;font-size:13px">Evin öne çıkan yönlerini, çevresini ve ulaşımı anlatın.</p><button type="button" class="lnk dtas" id="w-dt">✨ Bilgilerden açıklama taslağı oluştur</button><textarea id="w-d" rows="8" maxlength="3000" placeholder="Örn. Güney cephe, yeni tadilatlı, okula 5 dakika yürüme mesafesinde...">${esc(W.d)}</textarea></div><div class="pn" style="margin-top:18px"><h3 style="margin:0 0 12px">Özet</h3><dl class="sum"><dt>Tip</dt><dd>${esc(W.tip)} · ${esc(W.tur)}</dd><dt>Fiyat</dt><dd>${W.f ? TL(W.f) : '-'}</dd><dt>Alan</dt><dd>${W.m2 || '-'} m²</dd><dt>Konum</dt><dd>${yer(W)}</dd>${W.adr ? `<dt>Açık adres</dt><dd>${esc(W.adr)} <span class="mu">(sadece siz)</span></dd>` : ''}${ar ? '' : `<dt>Oda</dt><dd>${esc(W.oda)}</dd><dt>Kat</dt><dd>${kv('kat', W.kat)}</dd>`}<dt>Fotoğraf</dt><dd>${W.p.length} adet</dd><dt>Video</dt><dd>${W._vb ? 'Var (' + MB(W._vb.size) + ')' : W.v ? 'Var' : 'Yok'}</dd></dl></div>`;
   $('#app').innerHTML = `<div class="wz"><div class="sh"><span>Adım ${s + 1}/4 · ${STEPS[s]}${W._edit ? ' · Düzenleme' : ''}</span><button type="button" id="w-x" style="padding:6px 12px;font-size:13px">Kapat</button></div><div class="pg"><i style="width:${(s + 1) * 25}%"></i></div>${body}<div class="err" id="w-e" role="alert"></div></div><div class="bar">${s ? '<button type="button" id="w-b">Geri</button>' : ''}<button type="button" class="pr" id="w-n">${s === 3 ? (W._edit ? 'Kaydet' : 'İlanı yayınla') : 'Devam'}</button></div>`;
   const A = $('#app'), er = (t) => { $('#w-e').textContent = t; }, re = () => { wsync(); draft(); wiz(); };
   A.querySelectorAll('[data-k]').forEach((b) => (b.onclick = () => { wsync(); W[b.dataset.k] = b.dataset.v; draft(); wiz(); }));
@@ -445,7 +657,11 @@ function wiz() {
   A.querySelectorAll('[data-sk]').forEach((b) => (b.onclick = () => { const k = b.dataset.sk; W[k] = Math.max(+b.dataset.a, Math.min(+b.dataset.b, (+W[k] || 0) + +b.dataset.sd)); $('#o-' + k).textContent = kv(k, W[k]); draft(); }));
   A.querySelectorAll('[data-rm]').forEach((b) => (b.onclick = () => { wsync(); W.p.splice(+b.dataset.rm, 1); re(); }));
   A.querySelectorAll('[data-cv]').forEach((b) => (b.onclick = () => { wsync(); const [x] = W.p.splice(+b.dataset.cv, 1); W.p.unshift(x); re(); }));
-  if ($('#w-t')) $('#w-t').oninput = (e) => { $('#w-c').textContent = e.target.value.length; };
+  if ($('#w-t')) $('#w-t').oninput = (e) => { $('#w-c').textContent = e.target.value.length; A.querySelectorAll('[data-sg]').forEach((c) => c.classList.toggle('on', c.dataset.sg === e.target.value)); };
+  A.querySelectorAll('[data-sg]').forEach((b) => (b.onclick = () => { const t = $('#w-t'); t.value = b.dataset.sg; t.dispatchEvent(new Event('input')); wsync(); draft(); er(''); }));
+  if ($('#w-dt')) $('#w-dt').onclick = () => { const d = $('#w-d'); if (d.value.trim() && !confirm('Yazdığınız açıklamanın yerine taslak yazılsın mı?')) return; d.value = taslak(); wsync(); draft(); d.focus(); d.setSelectionRange(0, 0); d.scrollTop = 0; toast('Taslak hazır, dilediğiniz gibi düzenleyin'); };
+  if (SR) micBind(A);
+  vidBind(A, er);
   if ($('#w-f')) $('#w-f').oninput = (e) => { const v = e.target.value.replace(/\D/g, '').slice(0, 12); e.target.value = v ? Number(v).toLocaleString('tr-TR') : ''; };
   const add = async (fl, inp) => {
     const all = [...fl].filter((f) => f.type.startsWith('image/') || /\.(jpe?g|png|heic|heif|webp)$/i.test(f.name)), room = 15 - W.p.length, fs = all.slice(0, room);
@@ -463,11 +679,13 @@ function wiz() {
   if ($('#w-cam')) $('#w-cam').onchange = (e) => add(e.target.files, e.target);
   if ($('#w-gal')) $('#w-gal').onchange = (e) => add(e.target.files, e.target);
   if ($('#w-camb')) $('#w-camb').onclick = () => { if (W.p.length >= 15) return er('En fazla 15 fotoğraf ekleyebilirsiniz.'); wsync(); camOpen(); };
-  $('#w-x').onclick = () => { wsync(); if (!W._edit) { draft(); toast('Taslak kaydedildi'); } W = null; panel(); };
-  if ($('#w-b')) $('#w-b').onclick = () => { wsync(); ws--; draft(); wiz(); scrollTo(0, 0); };
+  $('#w-x').onclick = () => { if (W._vbusy && !confirm('Video hâlâ hazırlanıyor. Çıkarsanız video eklenmez. Çıkılsın mı?')) return; W._vbusy = 0; setVid(null); wsync(); if (!W._edit) { draft(); toast('Taslak kaydedildi'); } W = null; panel(); };
+  if ($('#w-b')) $('#w-b').onclick = () => { if (W._vbusy) return er('Video hazırlanıyor, lütfen bitmesini bekleyin.'); wsync(); ws--; draft(); wiz(); scrollTo(0, 0); };
   $('#w-n').onclick = async () => {
     wsync();
-    if (s === 0 && W.t.trim().length < 5) return er('Başlık en az 5 karakter olmalı.');
+    if (W._vbusy) return er('Video hazırlanıyor, lütfen bitmesini bekleyin.');
+    if (s === 0 && W.t.trim() && W.t.trim().length < 5) return er('Başlık en az 5 karakter olmalı ya da boş bırakın.');
+    if (s === 3 && W.t.trim().length < 5) { $('#w-t').focus(); return er('İlan başlığını yazın ya da önerilerden birine dokunun (en az 5 karakter).'); }
     if (s === 1 && !W.p.length) return er('En az bir fotoğraf ekleyin.');
     if (s === 2) { if (!W.f) return er('Fiyatı girin.'); if (!W.m2) return er('Alanı (m²) girin.'); if (!W.il || !W.ilce) return er('İl ve ilçeyi girin ya da Mevcut konumumu kullan butonuna dokunun.'); }
     if (s < 3) { ws++; draft(); wiz(); scrollTo(0, 0); return; }
@@ -488,12 +706,18 @@ async function kaydet(btn, er) {
       const r = await api('/photos', { method: 'POST', raw: blob, type: 'image/jpeg' });
       W.p[k] = r.url; draft();
     }
+    if (W._vb) {
+      btn.textContent = 'Video yükleniyor %0…';
+      W.v = await upVid(W._vb, (p) => { btn.textContent = `Video yükleniyor %${Math.round(p * 100)}…`; });
+      setVid(null); draft();
+    }
     btn.textContent = 'Kaydediliyor…';
+    const body = JSON.parse(JSON.stringify(W, wrep));
     const l = W._edit
-      ? await api('/listings/' + W._edit, { method: 'PUT', body: W })
-      : await api('/listings', { method: 'POST', body: W });
+      ? await api('/listings/' + W._edit, { method: 'PUT', body })
+      : await api('/listings', { method: 'POST', body });
     const nw = !W._edit;
-    nod(); W = null; MY = null;
+    nod(); setVid(null); W = null; MY = null;
     await refreshPublic();
     toast(nw ? 'İlan yayınlandı' : 'Kaydedildi');
     go(l.url);
