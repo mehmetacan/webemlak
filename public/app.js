@@ -106,29 +106,106 @@ const AMAC = [
 ];
 const svgI = (p, c = '') => `<svg class="${c}" viewBox="0 0 32 32" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">${p}</svg>`;
 const waOfis = () => waNo(SS.tel);
-function home() {
-  setTitle('');
-  const tel = (SS.tel || '').trim(), wa = waOfis();
-  const bolge = String(SS.bolge || '').split(/[,\n]/).map((x) => x.trim()).filter(Boolean);
-  const hak = String(SS.hak || '').split(/\n\s*\n/)[0];
-  const quick = `<div class="qk"><div class="qkh"><b>Ne yapmak istiyorsunuz?</b><span>Birini seçin, 1 dakikada talebinizi oluşturun.</span></div><div class="qkg">${AMAC.map(([k, t, d, ic]) => `<a class="qki" href="/talep?amac=${k}">${svgI(ic)}<span><b>${t}</b><small>${d}</small></span></a>`).join('')}</div></div>`;
-  $('#app').innerHTML = `${me ? `<div class="ekb"><span>Ekip görünümü: ziyaretçiler bu sayfayı görür.</span><a href="/ilanlar">Portföye git ${ARR}</a></div>` : ''}
-  <section class="h2o ${SS.foto ? 'ft' : ''}"><div class="h2t"><span class="eyb">Asya Emlak · Antalya</span><h1>${esc(SS.hero || 'Aradığınız evi anlatın, biz bulalım.')}</h1><p>${esc(SS.sub)}</p><div class="pls"><a class="pill pr" href="/talep">Talep oluşturun ${ARR}</a>${wa ? `<a class="pill" href="https://wa.me/90${esc(wa)}?text=${encodeURIComponent('Merhaba, bilgi almak istiyorum.')}" target="_blank" rel="noopener">${WAI} WhatsApp</a>` : tel ? `<a class="pill" href="tel:${esc(tel)}">${PHONE} Arayın</a>` : ''}</div></div>
-   <div class="h2r">${SS.foto ? `<div class="h2f" style="background-image:url('${esc(SS.foto)}')" role="img" aria-label="Asya Emlak"></div>` : ''}${quick}</div></section>
-  <section class="s2"><div class="s2h"><span class="eyb">Nasıl çalışıyoruz</span><h2>İlan aramakla uğraşmayın.<br>Ne istediğinizi söyleyin.</h2></div>
-   <div class="stp3">${[['Talebinizi oluşturun', 'Nasıl bir ev, hangi bölge, ne kadar bütçe? Birkaç dokunuşla anlatın.'], ['WhatsApp\'tan bize ulaşsın', 'Talebiniz hazır bir mesaj olarak doğrudan WhatsApp\'ımıza gelir.'], ['Size uygun olanları sunalım', 'Danışmanımız arar, size uyan seçenekleri fotoğraf ve videolarıyla iletir.']].map(([t, d], i) => `<div><b>0${i + 1}</b><h3>${t}</h3><p>${d}</p></div>`).join('')}</div></section>
-  <section class="s2"><div class="s2h"><span class="eyb">Neler yapıyoruz</span><h2>Alırken de satarken de yanınızdayız.</h2></div>
-   <div class="srv">${SVC.map(([t, d, ic]) => `<div>${svgI(ic)}<h3>${t}</h3><p>${d}</p></div>`).join('')}</div></section>
-  ${bolge.length ? `<section class="s2"><div class="s2h"><span class="eyb">Bölgeler</span><h2>Hizmet verdiğimiz yerler</h2></div><div class="bol">${bolge.map((b) => `<span>${PIN}${esc(b)}</span>`).join('')}</div></section>` : ''}
-  ${hak ? `<section class="s2"><div class="hk"><span class="eyb">Hakkımızda</span><p>${esc(hak)}</p><a class="lnk" href="/hakkimizda">Bizi tanıyın ${ARR}</a></div></section>` : ''}
-  <section class="cta2"><div><h2>Hayalinizdeki evi birlikte bulalım.</h2><p>Talebinizi bırakın, sizi arayalım. Hiçbir ücret ya da yükümlülük yok.</p></div><a class="pill pr" href="/talep">Talep oluşturun ${ARR}</a></section>`;
-}
 const SVC = [
   ['Konut', 'Daire, villa ve müstakil evlerde doğru fiyatı belirler, alıcı ve kiracıyla buluşturur, tapuya kadar süreci yönetiriz.', '<path d="M4 15L16 5l12 10"/><path d="M7 12.5V27h18V12.5"/><path d="M13 27v-7h6v7"/>'],
   ['İşyeri', 'Dükkan, ofis ve depo alım-satım ve kiralamada konum, cadde ve ciro potansiyeline göre danışmanlık veririz.', '<path d="M4 12l2-6h20l2 6"/><path d="M4 12h24v2a3 3 0 0 1-6 0 3 3 0 0 1-6 0 3 3 0 0 1-6 0 3 3 0 0 1-6 0z"/><path d="M6 17v10h20V17M13 27v-6h6v6"/>'],
   ['Arsa ve tarla', 'İmar durumu ve bölge değerine göre yatırım odaklı danışmanlık veririz.', '<path d="M3 23l8-7 6 5 5-4 7 6"/><path d="M3 27h26"/><path d="M22 5v8M22 5l5 2-5 2"/>'],
   ['Değerleme ve yetki', 'Piyasa verisiyle fiyat analizi yapar, e-Devlet yetkilendirmesinde yol gösteririz.', '<path d="M16 3l11 5v7c0 7-5 12-11 14C10 27 5 22 5 15V8z"/><path d="M11 16l4 4 7-8"/>'],
 ];
+
+// Antalya esintili sahne: dağlar, deniz, apartman, villa, palmiye (hafif animasyonlu)
+const SAHNE = `<svg class="sahne" viewBox="0 0 600 500" role="img" aria-label="Deniz kenarında apartman ve villa çizimi" preserveAspectRatio="xMidYMid slice">
+<defs><linearGradient id="gsky" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#f7eedd"/><stop offset="1" stop-color="#f1e3c6"/></linearGradient>
+<radialGradient id="gsun"><stop offset="0" stop-color="#f3d58f"/><stop offset=".6" stop-color="#e8c272"/><stop offset="1" stop-color="#e8c272" stop-opacity="0"/></radialGradient>
+<linearGradient id="gsea" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#cfdcd9"/><stop offset="1" stop-color="#e3e6dc"/></linearGradient>
+<linearGradient id="gglass" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#f6e7c5"/><stop offset="1" stop-color="#e3c98f"/></linearGradient></defs>
+<rect width="600" height="500" fill="url(#gsky)"/>
+<g class="sun"><circle cx="455" cy="140" r="95" fill="url(#gsun)" opacity=".55"/><circle cx="455" cy="140" r="44" fill="#ebc87c"/></g>
+<g class="cloud c1" fill="#fffaf0" opacity=".9"><ellipse cx="120" cy="90" rx="44" ry="14"/><ellipse cx="148" cy="80" rx="28" ry="14"/></g>
+<g class="cloud c2" fill="#fffaf0" opacity=".75"><ellipse cx="330" cy="62" rx="34" ry="10"/><ellipse cx="350" cy="55" rx="20" ry="10"/></g>
+<g class="birds" fill="none" stroke="#7d6a4f" stroke-width="1.6" stroke-linecap="round"><path d="M300 120q6-6 12 0q6-6 12 0"/><path d="M332 104q4-4 8 0q4-4 8 0"/></g>
+<path d="M0 262l60-38 52 22 70-58 64 44 50-26 82 52 56-30 70 40 96-52v60H0z" fill="#e2d2b2"/>
+<path d="M0 286l90-30 70 18 90-36 80 34 90-22 90 30 90-20v40H0z" fill="#d6c39c" opacity=".8"/>
+<rect y="300" width="600" height="34" fill="url(#gsea)"/>
+<g class="waves" stroke="#fff" stroke-width="1.6" stroke-linecap="round" opacity=".8" fill="none"><path d="M-40 312h40m30 0h60m40 0h30m50 0h70m40 0h40m60 0h50m40 0h60m30 0h40"/><path d="M-20 324h50m40 0h40m60 0h30m40 0h70m30 0h50m50 0h40m40 0h60"/></g>
+<rect y="334" width="600" height="166" fill="#efe5d2"/>
+<path d="M0 470c120-40 260-44 380-30s170 10 220 0v60H0z" fill="#e6d9c0"/>
+<g class="apt" stroke="#3b3024" stroke-width="2" stroke-linejoin="round">
+ <rect x="62" y="168" width="150" height="236" rx="4" fill="#fffaf2"/>
+ <rect x="56" y="160" width="162" height="12" rx="3" fill="#efe1c3"/>
+ <g fill="#f3e6c9" stroke-width="1.6">${[0, 1, 2, 3, 4, 5].map((r) => [0, 1, 2].map((c) => `<rect class="win w${(r * 3 + c) % 7}" x="${78 + c * 44}" y="${184 + r * 34}" width="30" height="22" rx="2"/>`).join('')).join('')}</g>
+ <g fill="none" stroke-width="1.5">${[0, 1, 2, 3, 4].map((r) => `<path d="M66 ${213 + r * 34}h142"/>`).join('')}</g>
+ <rect x="122" y="374" width="30" height="30" rx="2" fill="#e8d5ad"/>
+</g>
+<g class="villa" stroke="#3b3024" stroke-width="2" stroke-linejoin="round">
+ <rect x="268" y="292" width="150" height="112" rx="3" fill="#fffaf2"/>
+ <rect x="378" y="254" width="150" height="150" rx="3" fill="#fbf3e4"/>
+ <path d="M260 292h166M370 254h166" stroke-width="5" stroke-linecap="round"/>
+ <rect x="286" y="318" width="70" height="56" rx="2" fill="url(#gglass)" stroke-width="1.6"/><path d="M321 318v56" stroke-width="1.4"/>
+ <rect x="396" y="276" width="114" height="44" rx="2" fill="url(#gglass)" stroke-width="1.6"/><path d="M434 276v44M472 276v44" stroke-width="1.4"/>
+ <rect x="396" y="340" width="52" height="64" rx="2" fill="#e8d5ad"/><circle cx="440" cy="372" r="2.4" fill="#3b3024" stroke="none"/>
+ <rect x="462" y="340" width="48" height="40" rx="2" fill="url(#gglass)" stroke-width="1.6"/>
+ <path d="M372 320h-6v84" stroke-width="1.5" fill="none"/>
+</g>
+<rect x="282" y="410" width="200" height="16" rx="8" fill="#cfdcd9" stroke="#3b3024" stroke-width="1.6"/>
+<g class="palm"><path d="M552 418c-6-60-2-120 10-160" stroke="#8a6a3e" stroke-width="6" fill="none" stroke-linecap="round"/>
+ <g fill="#a5ab84" stroke="#6f744f" stroke-width="1.2"><path d="M562 258c-30-14-60-6-74 12 26-6 50-4 74-12z"/><path d="M562 258c-18-28-44-36-66-30 24 8 44 16 66 30z"/><path d="M562 258c10-30 34-44 58-42-22 12-40 24-58 42z"/><path d="M562 258c32-8 58 4 70 22-26-8-46-14-70-22z"/><path d="M562 258c-4 26-16 44-34 54 10-22 20-38 34-54z"/></g></g>
+<g class="bush" fill="#b9bc96" stroke="#6f744f" stroke-width="1.2"><ellipse cx="248" cy="402" rx="22" ry="14"/><ellipse cx="232" cy="406" rx="14" ry="10"/><ellipse cx="536" cy="408" rx="18" ry="11"/></g>
+</svg>`;
+const MINI = {
+  konut: '<svg viewBox="0 0 160 110" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><rect x="28" y="18" width="56" height="84" rx="3" fill="var(--pn)"/><rect x="84" y="44" width="48" height="58" rx="3" fill="var(--pn)"/>' + [0, 1, 2, 3].map((r) => [0, 1].map((c) => `<rect x="${37 + c * 22}" y="${28 + r * 18}" width="14" height="10" rx="1.5" class="mw" fill="var(--champ2)"/>`).join('')).join('') + '<rect x="94" y="56" width="12" height="10" rx="1.5" fill="var(--champ2)"/><rect x="112" y="56" width="12" height="10" rx="1.5" fill="var(--champ2)"/><rect x="100" y="80" width="16" height="22" rx="1.5" fill="var(--champ2)"/><path d="M12 102h136"/></svg>',
+  villa: '<svg viewBox="0 0 160 110" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><rect x="22" y="52" width="62" height="44" rx="2" fill="var(--pn)"/><rect x="78" y="34" width="62" height="62" rx="2" fill="var(--pn)"/><path d="M18 52h68M74 34h70" stroke-width="4" stroke-linecap="round"/><rect x="32" y="62" width="30" height="24" rx="1.5" fill="var(--champ2)"/><rect x="88" y="44" width="42" height="18" rx="1.5" fill="var(--champ2)"/><rect x="88" y="70" width="18" height="26" rx="1.5" fill="var(--champ2)"/><rect x="34" y="99" width="90" height="8" rx="4" fill="#cfdcd9"/><path d="M8 103h20M132 103h20"/></svg>',
+  isyeri: '<svg viewBox="0 0 160 110" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><rect x="26" y="40" width="108" height="62" rx="2" fill="var(--pn)"/><path d="M20 40l8-20h104l8 20z" fill="var(--pn)"/><path d="M20 40h120v6a8 8 0 0 1-15 0 8 8 0 0 1-15 0 8 8 0 0 1-15 0 8 8 0 0 1-15 0 8 8 0 0 1-15 0 8 8 0 0 1-15 0 8 8 0 0 1-15 0 8 8 0 0 1-15 0z" fill="var(--champ2)"/><rect x="38" y="58" width="50" height="32" rx="1.5" fill="var(--champ2)"/><rect x="98" y="58" width="24" height="44" rx="1.5" fill="var(--champ)"/><path d="M50 74h26" stroke-width="1.6"/><path d="M10 102h140"/></svg>',
+  arsa: '<svg viewBox="0 0 160 110" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"><path d="M10 74l34-22 26 14 30-24 50 34v26H10z" fill="var(--champ)"/><path d="M10 88c30-8 60-10 90-6s34 4 50 0" /><path d="M22 96v-14M40 94v-14M58 92v-14M76 92v-14M94 92v-14M112 92v-14M130 92v-14" stroke-width="1.6"/><path d="M18 86h120" stroke-width="1.4"/><path d="M104 66V22" /><path class="flag" d="M104 22l24 8-24 8z" fill="var(--champ2)"/><circle cx="40" cy="30" r="9" fill="var(--champ2)"/></svg>',
+};
+const KARTLAR = [
+  ['konut', 'Daire ve rezidans', 'Şehrin içinde, ulaşıma ve okula yakın daireler.', 'al', 'konut'],
+  ['villa', 'Villa ve müstakil ev', 'Bahçeli, havuzlu, sakin bir yaşam isteyenlere.', 'al', 'konut'],
+  ['isyeri', 'Dükkan, ofis, depo', 'Cadde üzeri dükkanlardan ofis katlarına işyerleri.', 'al', 'isyeri'],
+  ['arsa', 'Arsa ve tarla', 'İmarlı arsa, tarla ve bahçe yatırımları.', 'al', 'arsa'],
+];
+const KAYAN = ['Daire', 'Villa', 'Müstakil ev', 'Dükkan', 'Ofis', 'Depo', 'Arsa', 'Tarla', 'Satılık', 'Kiralık', 'Yatırımlık', 'Deniz manzaralı', 'Site içinde'];
+let RVO = null;
+function reveal() {
+  if (RVO) RVO.disconnect();
+  const els = document.querySelectorAll('.rv');
+  if (!('IntersectionObserver' in window) || matchMedia('(prefers-reduced-motion: reduce)').matches) { els.forEach((e) => e.classList.add('in')); return; }
+  RVO = new IntersectionObserver((es) => es.forEach((e) => { if (e.isIntersecting) { e.target.classList.add('in'); RVO.unobserve(e.target); } }), { threshold: 0.18, rootMargin: '0px 0px -40px 0px' });
+  els.forEach((e) => RVO.observe(e));
+}
+function home() {
+  setTitle('');
+  const tel = (SS.tel || '').trim(), wa = waOfis();
+  const bolge = String(SS.bolge || '').split(/[,\n]/).map((x) => x.trim()).filter(Boolean);
+  const bolgeler = bolge.length ? bolge : ['Konyaaltı', 'Muratpaşa', 'Kepez', 'Lara', 'Döşemealtı'];
+  const hak = String(SS.hak || '').split(/\n\s*\n/)[0];
+  const ornekYer = bolgeler[0];
+  $('#app').innerHTML = `${me ? `<div class="ekb"><span>Ekip görünümü: ziyaretçiler bu sayfayı görür.</span><a href="/ilanlar">Portföye git ${ARR}</a></div>` : ''}
+  <section class="h3o"><div class="h3t"><span class="eyb a1">Asya Emlak · Antalya</span><h1 class="a2">${esc(SS.hero || 'Aradığınız evi anlatın, biz bulalım.')}</h1><p class="a3">${esc(SS.sub)}</p><div class="pls a4"><a class="pill pr" href="/talep">Talep oluşturun ${ARR}</a>${wa ? `<a class="pill" href="https://wa.me/90${esc(wa)}?text=${encodeURIComponent('Merhaba, bilgi almak istiyorum.')}" target="_blank" rel="noopener">${WAI} WhatsApp</a>` : tel ? `<a class="pill" href="tel:${esc(tel)}">${PHONE} Arayın</a>` : ''}</div>
+    <div class="h3m a5"><span><b>Konut</b> · <b>İşyeri</b> · <b>Arsa</b></span><span>Satış · Kiralama · Değerleme</span></div></div>
+   <div class="h3v a3">${SS.foto ? `<div class="h3f" style="background-image:url('${esc(SS.foto)}')" role="img" aria-label="Asya Emlak"></div>` : SAHNE}
+    <div class="fc f1"><i>${svgI(KAT.konut[2])}</i><div><b>3+1 Daire · ${esc(ornekYer)}</b><small>Talebinize uygun</small></div></div>
+    <div class="fc f2"><i class="g">${WAI}</i><div><b>Talebiniz bize ulaştı</b><small>Danışmanınız sizi arayacak ✓</small></div></div></div></section>
+  <section class="qs rv"><div class="qsi">${AMAC.map(([k, t, d, ic]) => `<a class="qsx" href="/talep?amac=${k}">${svgI(ic)}<span><b>${t}</b><small>${d}</small></span><em>${ARR}</em></a>`).join('')}</div></section>
+  <div class="mq" aria-hidden="true"><div>${[...KAYAN, ...KAYAN].map((x) => `<span>${x}</span>`).join('')}</div></div>
+  <section class="s2"><div class="s2h rv"><span class="eyb">Ne arıyorsunuz?</span><h2>Her ihtiyaca uygun mülk, tek bir danışman.</h2></div>
+   <div class="kgr">${KARTLAR.map(([ic, t, d, am, kat], i) => `<a class="kg rv" style="--d:${i * 90}ms" href="/talep?amac=${am}&kat=${kat}"><div class="kgi">${MINI[ic]}</div><h3>${t}</h3><p>${d}</p><span class="lnk">Talep oluştur ${ARR}</span></a>`).join('')}</div></section>
+  <section class="s2"><div class="hw"><div class="hwt rv"><span class="eyb">Nasıl çalışıyoruz</span><h2>İlan aramakla uğraşmayın. Ne istediğinizi söyleyin.</h2>
+    <ol class="hws">${[['Talebinizi oluşturun', 'Nasıl bir yer, hangi bölge, ne kadar bütçe? Birkaç dokunuşla anlatın.'], ['WhatsApp\'tan bize ulaşsın', 'Talebiniz hazır bir mesaj olarak doğrudan WhatsApp\'ımıza gelir.'], ['Size uygun olanları sunalım', 'Danışmanınız size uyan seçenekleri fotoğraf ve videolarıyla iletir, yer göstermeye birlikte gidersiniz.']].map(([t, d], i) => `<li><b>${i + 1}</b><div><h3>${t}</h3><p>${d}</p></div></li>`).join('')}</ol>
+    <a class="pill pr" href="/talep">Hemen başlayın ${ARR}</a></div>
+   <div class="phn rv" aria-hidden="true"><div class="phs"><div class="phh"><i><img src="/icon.png" alt="" width="34" height="34"></i><div><b>Asya Emlak</b><small>çevrimiçi</small></div></div><div class="phb">
+     <div class="bb me" style="--d:.2s">Merhaba, ${esc(ornekYer)}'da 3+1 daire arıyoruz. Bütçemiz 5 milyon civarı 🙂</div>
+     <div class="bb ty" style="--d:1.1s"><i></i><i></i><i></i></div>
+     <div class="bb" style="--d:1.9s">Merhaba! Talebinize uygun 3 seçenek hazırladım 🏡</div>
+     <div class="bb card" style="--d:2.7s"><div class="bci">${MINI.konut}</div><b>3+1 · 140 m² · ${esc(ornekYer)}</b><small>Site içinde · Havuzlu · 4. kat</small></div>
+     <div class="bb me" style="--d:3.7s">Çok güzel! Cumartesi görebilir miyiz?</div>
+     <div class="bb" style="--d:4.5s">Tabii, 11:00'de buluşalım 👍</div>
+   </div></div></div></div></section>
+  <section class="s2"><div class="s2h rv"><span class="eyb">Bölgeler</span><h2>Antalya'yı mahalle mahalle biliyoruz.</h2></div><div class="bol rv">${bolgeler.map((b) => `<span>${PIN}${esc(b)}</span>`).join('')}</div></section>
+  ${hak ? `<section class="s2"><div class="hk rv"><span class="eyb">Hakkımızda</span><p>${esc(hak)}</p><a class="lnk" href="/hakkimizda">Bizi tanıyın ${ARR}</a></div></section>` : ''}
+  <section class="cta3 rv"><div class="ctx"><h2>Hayalinizdeki evi birlikte bulalım.</h2><p>Talebinizi bırakın, sizi arayalım. Ücret ya da yükümlülük yok.</p><a class="pill pr" href="/talep">Talep oluşturun ${ARR}</a></div><div class="ctil">${MINI.villa}</div></section>`;
+  reveal();
+}
 
 // ---------- Talep oluşturma: her amaç için özel sayfa (WhatsApp'a iletilir, sitede saklanmaz) ----------
 const KAT = {
@@ -215,7 +292,7 @@ function talepMesaj() {
 }
 function talep() {
   setTitle('Talep oluşturun');
-  if (!TQ) { const q = new URLSearchParams(location.search).get('amac'); TQ = tNew(AM[q] ? q : ''); TS = TQ.amac ? 1 : 0; }
+  if (!TQ) { const sp = new URLSearchParams(location.search), q = sp.get('amac'), kt = sp.get('kat'); TQ = tNew(AM[q] ? q : ''); if (TQ.amac && AM[q].kats.includes(kt)) TQ.kat = kt; TS = TQ.amac ? 1 : 0; }
   const wa = waOfis(), N = 4, c = AM[TQ.amac];
   const fh = (f) => {
     if (!f) return '';
