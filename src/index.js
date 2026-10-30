@@ -10,9 +10,10 @@ const LOGIN_MAX_TRIES = 5;
 const LOGIN_WINDOW_SEC = 15 * 60;
 
 const TIPLER = ['Satılık', 'Kiralık'];
-const TURLER = ['Daire', 'Müstakil', 'Villa', 'Dubleks', 'Tarla', 'Parsel'];
-const OZELLIKLER = ['Balkon', 'Otopark', 'Eşyalı', 'Güvenlik', 'Havuz'];
-const AYAR_ANAHTARLARI = ['hero', 'sub', 'tel', 'mail', 'adr', 'saat', 'hak', 'bolge', 'foto'];
+const TURLER = ['Daire', 'Müstakil', 'Villa', 'Dubleks', 'Dükkan', 'Ofis', 'Depo', 'Tarla', 'Parsel'];
+const ISYERI = ['Dükkan', 'Ofis', 'Depo'];
+const OZELLIKLER = ['Balkon', 'Otopark', 'Eşyalı', 'Güvenlik', 'Havuz', 'Cadde üzeri', 'Köşe başı', 'Vitrinli', 'Yüksek tavan', 'Kamyon girişi'];
+const AYAR_ANAHTARLARI = ['hero', 'sub', 'tel', 'mail', 'adr', 'saat', 'hak', 'bolge', 'foto', 'harita', 'harita_e'];
 const DURUMLAR = ['aktif', 'opsiyon', 'satildi', 'kiralandi', 'pasif'];
 const PAYLASIM_GUN = [1, 3, 7, 15, 30];
 const AYAR_VARSAYILAN = {
@@ -25,6 +26,8 @@ const AYAR_VARSAYILAN = {
   hak: 'Asya Emlak, alıcı ve kiracıları doğru mülkle buluşturmak için çalışan bir emlak danışmanlığı firmasıdır.',
   bolge: '',
   foto: '',
+  harita: '',
+  harita_e: '',
 };
 
 class HttpError extends Error {
@@ -230,7 +233,7 @@ function parseListing(b) {
     mah: str(b.mah, 100, { name: 'Mahalle' }),
     adres: str(b.adr, 300, { name: 'Açık adres' }),
     lat, lon,
-    oda: arsa ? '-' : str(b.oda, 10, { name: 'Oda' }),
+    oda: arsa || ISYERI.includes(tur) ? '-' : str(b.oda, 10, { name: 'Oda' }),
     kat: arsa ? 0 : int(b.kat ?? 0, -5, 200, 'Kat'),
     yas: arsa ? 0 : int(b.yas ?? 0, 0, 300, 'Bina yaşı'),
     asansor: arsa ? 0 : (Number(b.as) ? 1 : 0),
@@ -256,6 +259,34 @@ async function getListingRow(env, id) {
 async function deletePhotos(env, keys) {
   if (!env.FOTO || !keys.length) return;
   await env.FOTO.delete(keys);
+}
+
+// Google Haritalar işletme bağlantısını çözer: kısa bağlantıyı açar, işletme kimliğini (cid) ya da koordinatı bulur
+async function haritaCoz(raw) {
+  let u = String(raw || '').trim();
+  if (!u) return { link: '', embed: '' };
+  const m0 = /https?:\/\/\S+/.exec(u); if (m0) u = m0[0];
+  const hata = () => new HttpError(400, "Google Haritalar bağlantısı anlaşılamadı. İşletmenizi Google Haritalar'da açıp Paylaş → Bağlantıyı kopyala ile aldığınız bağlantıyı yapıştırın.");
+  let url; try { url = new URL(u); } catch { throw hata(); }
+  if (!/(^|\.)(google\.[a-z.]+|goo\.gl|g\.page)$/i.test(url.hostname)) throw hata();
+  for (let i = 0; i < 4 && /goo\.gl$|g\.page$/i.test(url.hostname); i++) {
+    const r = await fetch(url.toString(), { redirect: 'manual', headers: { 'user-agent': 'Mozilla/5.0' } });
+    const loc = r.headers.get('location'); if (!loc) break;
+    url = new URL(loc, url);
+  }
+  const s = decodeURIComponent(url.toString());
+  let cid = url.searchParams.get('cid');
+  const ft = /(?:ftid=|!1s)0x[0-9a-f]+:0x([0-9a-f]+)/i.exec(s);
+  if (!cid && ft) cid = BigInt('0x' + ft[1]).toString();
+  if (cid && !/^\d{5,25}$/.test(cid)) cid = null;
+  const ll = /!3d(-?\d+\.\d+)!4d(-?\d+\.\d+)/.exec(s) || /@(-?\d+\.\d+),(-?\d+\.\d+)/.exec(s);
+  const ad = (/\/place\/([^/@]+)/.exec(s) || [])[1];
+  const q = url.searchParams.get('q');
+  if (cid) return { link: `https://www.google.com/maps?cid=${cid}`, embed: `https://www.google.com/maps?cid=${cid}&z=16&output=embed&hl=tr` };
+  if (ll) { const lat = ll[1], lng = ll[2], name = ad ? ad.replace(/\+/g, ' ') : `${lat},${lng}`;
+    return { link: url.toString(), embed: `https://www.google.com/maps?q=${encodeURIComponent(name)}&ll=${lat},${lng}&z=17&output=embed&hl=tr` }; }
+  if (q) return { link: url.toString(), embed: `https://www.google.com/maps?q=${encodeURIComponent(q)}&z=16&output=embed&hl=tr` };
+  throw hata();
 }
 
 async function sharedListing(env, token) {
@@ -377,8 +408,10 @@ async function api(req, env, url) {
   if (path === '/settings' && method === 'PUT') {
     requireAdmin(user);
     const b = await body();
+    delete b.harita_e;
+    if ('harita' in b) { const hm = await haritaCoz(b.harita); b.harita = hm.link; b.harita_e = hm.embed; }
     const stmts = AYAR_ANAHTARLARI.filter((k) => k in b).map((k) =>
-      env.DB.prepare('INSERT OR REPLACE INTO settings (k, v) VALUES (?, ?)').bind(k, k === 'foto' ? (b.foto ? (keyFromUrl(b.foto) ? imgUrl(keyFromUrl(b.foto)) : (() => { throw new HttpError(400, 'Görsel geçersiz.'); })()) : '') : str(b[k], k === 'hak' ? 5000 : k === 'bolge' ? 1000 : 300))
+      env.DB.prepare('INSERT OR REPLACE INTO settings (k, v) VALUES (?, ?)').bind(k, k === 'foto' ? (b.foto ? (keyFromUrl(b.foto) ? imgUrl(keyFromUrl(b.foto)) : (() => { throw new HttpError(400, 'Görsel geçersiz.'); })()) : '') : str(b[k], k === 'hak' ? 5000 : k === 'bolge' ? 1000 : k.startsWith('harita') ? 600 : 300))
     );
     if (stmts.length) await env.DB.batch(stmts);
     return json({ ok: true });
