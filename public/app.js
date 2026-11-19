@@ -57,7 +57,10 @@ const mapLink = (l) => l.lat
   : `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent([l.adr, l.mah, l.ilce, l.il].filter(Boolean).join(', '))}`;
 const loading = (t = 'Yükleniyor…') => { $('#app').innerHTML = `<div class="w"><p class="mu">${t}</p></div>`; };
 const errBox = (m) => { $('#app').innerHTML = `<div class="w"><div class="pn"><p>${esc(m)}</p><a class="tg" href="/">Ana sayfaya dön</a></div></div>`; };
-const needLogin = () => { go('/giris', true); };
+// Girişten sonra gidilecek sayfa: istenen ekip sayfası varsa o, yoksa portföy
+let DONUS = '';
+const needLogin = () => { DONUS = cur && cur !== '/giris' ? cur : ''; go('/giris', true); };
+const girisSonrasi = () => { const d = DONUS; DONUS = ''; return d || '/ilanlar'; };
 
 async function shareIt(title, text, url) {
   try { if (navigator.share) { await navigator.share({ title, text, url }); return; } } catch (e) { if (e && e.name === 'AbortError') return; }
@@ -193,7 +196,7 @@ function home() {
   <section class="s2"><div class="hw"><div class="hwt rv"><span class="eyb">Nasıl çalışıyoruz</span><h2>İlan aramakla uğraşmayın. Ne istediğinizi söyleyin.</h2>
     <ol class="hws">${[['Talebinizi oluşturun', 'Nasıl bir yer, hangi bölge, ne kadar bütçe? Birkaç dokunuşla anlatın.'], ['WhatsApp\'tan bize ulaşsın', 'Talebiniz hazır bir mesaj olarak doğrudan WhatsApp\'ımıza gelir.'], ['Size uygun olanları sunalım', 'Danışmanınız size uyan seçenekleri fotoğraf ve videolarıyla iletir, yer göstermeye birlikte gidersiniz.']].map(([t, d], i) => `<li><b>${i + 1}</b><div><h3>${t}</h3><p>${d}</p></div></li>`).join('')}</ol>
     <a class="pill pr" href="/talep">Hemen başlayın ${ARR}</a></div>
-   <div class="phn rv" aria-hidden="true"><div class="phs"><div class="phh"><i><img src="/icon.png" alt="" width="34" height="34"></i><div><b>Asya Emlak</b><small>çevrimiçi</small></div></div><div class="phb">
+   <div class="phn rv" aria-hidden="true"><div class="phs"><div class="phh"><i><img src="/icon-192.png" alt="" width="34" height="34"></i><div><b>Asya Emlak</b><small>çevrimiçi</small></div></div><div class="phb">
      <div class="bb me" style="--d:.2s">Merhaba, ${esc(ornekYer)}'da 3+1 daire arıyoruz. Bütçemiz 5 milyon civarı 🙂</div>
      <div class="bb ty" style="--d:1.1s"><i></i><i></i><i></i></div>
      <div class="bb" style="--d:1.9s">Merhaba! Talebinize uygun 3 seçenek hazırladım 🏡</div>
@@ -580,7 +583,7 @@ function contact() {
 
 // ---------- Giriş / kurulum / hesap ----------
 function giris() {
-  if (me) return go('/panel', true);
+  if (me) return go(girisSonrasi(), true);
   const kur = kurulum;
   $('#app').innerHTML = `<div class="wz"><h2>${kur ? 'İlk kurulum' : 'Ekip girişi'}</h2><p class="mu" style="margin:0 0 6px">${kur ? 'Henüz hiç kullanıcı yok. Yönetici hesabınızı oluşturun. Bu formu yalnızca bir kez görürsünüz.' : 'Portföyü görmek, ilan eklemek ve müşterilere göndermek için giriş yapın.'}</p><form id="lgf" class="pn" style="margin-top:14px">${kur ? `<div class="fld"><span>Kurulum kodu</span><input name="kod" autocomplete="off" required></div><div class="fld"><span>Ad soyad</span><input name="ad" autocomplete="name" required></div><div class="fld"><span>Telefon</span><input name="tel" type="tel" autocomplete="tel" placeholder="05xx xxx xx xx"></div>` : ''}<div class="fld"><span>E-posta</span><input name="mail" type="email" autocomplete="${kur ? 'email' : 'username'}" required></div><div class="fld"><span>Şifre</span><input name="sifre" type="password" autocomplete="${kur ? 'new-password' : 'current-password'}" minlength="${kur ? 8 : 1}" required></div>${kur ? '<div class="fld"><span>Şifre (tekrar)</span><input name="sifre2" type="password" autocomplete="new-password" minlength="8" required></div><p class="mu">En az 8 karakter. Şifreniz sunucuda geri çözülemeyecek şekilde (özetlenerek) saklanır.</p>' : ''}<div class="err" id="lge" role="alert"></div><button class="pr" style="width:100%;padding:14px;font-size:16px;margin-top:6px">${kur ? 'Yönetici hesabını oluştur' : 'Giriş yap'}</button></form></div>`;
   $('#lgf').onsubmit = async (e) => {
@@ -592,7 +595,7 @@ function giris() {
       await api(kur ? '/setup' : '/login', { method: 'POST', body: d });
       await boot(false);
       toast(kur ? 'Yönetici hesabı oluşturuldu' : 'Giriş yapıldı');
-      go('/panel', true);
+      go(girisSonrasi(), true);
     } catch (err) { $('#lge').textContent = err.message; btn.disabled = false; }
   };
 }
@@ -1117,6 +1120,11 @@ async function boot(render = true) {
   me = m.user; kurulum = m.kurulum; fotoOk = m.foto; SS = s; MY = USERS = null;
   await refreshPublic();
   renderFooter();
+  // Ana ekrandaki uygulamadan açılışta: ekip üyesi giriş yapmışsa doğrudan portföy
+  const sp = new URLSearchParams(location.search), app = sp.get('kaynak') === 'uygulama' || matchMedia('(display-mode: standalone)').matches || navigator.standalone === true;
+  if (sp.has('kaynak')) { try { history.replaceState(history.state, '', location.pathname); } catch {} cur = pathOf(); }
+  if (render && !boot.ilk && app && me && location.pathname === '/') { boot.ilk = 1; return go('/ilanlar', true); }
+  boot.ilk = 1;
   if (render) route(); else renderNav();
 }
 if (location.hash && location.pathname === '/') { try { history.replaceState(null, '', fromHash(location.hash)); } catch {} cur = pathOf(); }

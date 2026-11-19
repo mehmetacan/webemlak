@@ -774,7 +774,7 @@ export default {
       if (url.pathname === '/robots.txt') return robotsTxt(env, url);
       if (url.pathname === '/sitemap.xml') return await sitemap(env, url);
       if (req.method !== 'GET' && req.method !== 'HEAD') return new Response('Bulunamadı', { status: 404 });
-      if (/\.[a-z0-9]{2,5}$/i.test(url.pathname)) return env.ASSETS.fetch(req);
+      if (/\.[a-z0-9]{2,12}$/i.test(url.pathname)) return env.ASSETS.fetch(req);
       return await renderPage(req, env, url);
     } catch (e) {
       if (e instanceof HttpError) return json({ hata: e.message }, e.status);
